@@ -43,15 +43,14 @@ void Application::createVulkanInstance()
     {
         throw std::runtime_error("Validation layers requested but none are available!");
     }
-    
-    // Setting basic app info
-    appInfo = vk::ApplicationInfo(
-        "GLFW Vulcan Example",
-        VK_MAKE_API_VERSION(0, 1, 0, 0),
-        "Simple Vulcan Renderer",
-        VK_MAKE_API_VERSION(0, 1, 0, 0),
-        VK_API_VERSION_1_3
-    );
+
+    appInfo = vk::ApplicationInfo()
+    .setPApplicationName("GLFW Vulcan Example")
+    .setApplicationVersion(1)
+    .setPEngineName("No Engine")
+    .setEngineVersion(1)
+    .setApiVersion(VK_API_VERSION_1_3);
+
 
     // Retrieving all required GLFW extensions for instance creation
     glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
@@ -64,17 +63,16 @@ void Application::createVulkanInstance()
 
     // Adding the portability extension (for MoltenVK driver compatibility issue) + Setting flag
     requiredExtensions.emplace_back(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME);
-    createInfo.flags |= vk::InstanceCreateFlags(vk::InstanceCreateFlagBits::eEnumeratePortabilityKHR);
+    flags = vk::InstanceCreateFlags(vk::InstanceCreateFlagBits::eEnumeratePortabilityKHR);
 
     // Setting up instance creation info to use our appInfo, not providing layerCount/layerNames and finally our extensions
-    createInfo = vk::InstanceCreateInfo(
-        {},
-        &appInfo,
-        static_cast<uint32_t>(validationLayers.size()),
-        validationLayers.data(),
-        static_cast<uint32_t>(requiredExtensions.size()),
-        requiredExtensions.data()
-    );
+    createInfo = vk::InstanceCreateInfo()
+    .setFlags(flags)
+    .setPApplicationInfo(&appInfo)
+    .setEnabledLayerCount(validationLayers.size())
+    .setPpEnabledLayerNames(validationLayers.data())
+    .setEnabledExtensionCount(requiredExtensions.size())
+    .setPpEnabledExtensionNames(requiredExtensions.data());
 
     // Due to `vk::enumerateInstanceExtensionProperties()` being marked: "nodiscard", the return value must be handled
     vk::Result result;

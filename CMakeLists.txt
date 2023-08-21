@@ -11,6 +11,13 @@ if (WIN32)
   set(VULKAN_LIBRARY "$ENV{VULKAN_SDK}/Lib/vulkan-1.lib")
 endif()
 
+if(APPLE)
+  set(VULKAN_INCLUDE_DIR "/Users/michaelwarrick/VulkanSDK/1.3.250.1/macOS/include")
+  set(VULKAN_LIBRARY "/Users/michaelwarrick/VulkanSDK/1.3.250.1/macOS/lib/libvulkan.1.3.250.dylib")
+  set(VULKAN_ICD_FILENAMES "/Users/michaelwarrick/VulkanSDK/1.3.250.1/macOS/share/vulkan/icd.d/MoltenVK_icd.json")
+  set(VULKAN_LAYER_PATH "/Users/michaelwarrick/VulkanSDK/1.3.250.1/macOS/share/vulkan/explicit_layer.d")
+endif()
+
 add_subdirectory(vendor/glfw)
 add_subdirectory(vendor/glm)
 
@@ -34,4 +41,11 @@ target_link_libraries(${PROJECT_NAME}
   glfw
   glm
   ${VULKAN_LIBRARY}
+)
+
+# Add the VK_ICD_FILENAMES and VK_LAYER_PATH environment variables as compile definitions
+target_compile_definitions(${PROJECT_NAME}
+  PRIVATE
+  VK_ICD_FILENAMES="${VULKAN_ICD_FILENAMES}"
+  VK_LAYER_PATH="${VULKAN_LAYER_PATH}"
 )

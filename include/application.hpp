@@ -25,6 +25,7 @@ private:
 
     // INSTANCE
     vk::Instance instance;
+    vk::InstanceCreateFlags flags;
     vk::ApplicationInfo appInfo{};
     vk::InstanceCreateInfo createInfo{};
 
