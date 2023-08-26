@@ -57,6 +57,6 @@ private:
     uint32_t layerCount = 0;
     std::vector<vk::LayerProperties> availableLayers;
 
-    VkDebugUtilsMessengerEXT debugMessanger;
+    vk::DebugUtilsMessengerEXT debugMessenger;
     vk::DebugUtilsMessengerCreateInfoEXT debugCreateInfo{};
 };

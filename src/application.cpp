@@ -22,14 +22,6 @@ void Application::initVulkan()
 
     if (enableValidationLayers)
     {
-#ifdef __APPLE__
-        // Enable MoltenVK's validation via environment variables
-        setenv("VK_LAYER_PATH", "@ VULKAN_LAYER_PATH @", 1);
-        setenv("VK_INSTANCE_LAYERS", "VK_LAYER_MESA_overlay", 1); // This enables MoltenVK's overlay for validation
-
-        // MoltenVK doesn't use the standard Vulkan debug callback.
-        return;
-#endif
         setupDebugMessenger();
     }
 }
@@ -46,9 +38,6 @@ void Application::shutdown()
 {
     if (enableValidationLayers)
     {
-#ifdef __APPLE__
-        return;
-#endif
         destroyDebugMessenger();
     }
 
@@ -241,13 +230,14 @@ void Application::setupDebugMessenger()
                           .setPUserData(nullptr);
 
     auto CreateDebugUtilsMessengerEXT = (PFN_vkCreateDebugUtilsMessengerEXT)this->instance.getProcAddr("vkCreateDebugUtilsMessengerEXT");
+
     if (CreateDebugUtilsMessengerEXT != nullptr)
     {
         VkDebugUtilsMessengerEXT tmp;
         const VkDebugUtilsMessengerCreateInfoEXT tmpCreateInfo = {VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT};
         if (CreateDebugUtilsMessengerEXT(this->instance, &tmpCreateInfo, nullptr, &tmp) == VK_SUCCESS)
         {
-            debugMessanger = tmp;
+            debugMessenger = tmp;
         }
         else
         {
@@ -258,6 +248,8 @@ void Application::setupDebugMessenger()
     {
         throw std::runtime_error("Cannot find required vkCreateDebugUtilsMessengerEXT function");
     }
+
+    // debugMessenger = instance.createDebugUtilsMessengerEXT(debugCreateInfo);
 }
 
 void Application::destroyDebugMessenger()
@@ -265,7 +257,7 @@ void Application::destroyDebugMessenger()
     auto DestroyDebugUtilsMessengerEXT = (PFN_vkDestroyDebugUtilsMessengerEXT)this->instance.getProcAddr("vkDestroyDebugUtilsMessengerEXT");
     if (DestroyDebugUtilsMessengerEXT != nullptr)
     {
-        DestroyDebugUtilsMessengerEXT(this->instance, this->debugMessanger, nullptr);
+        DestroyDebugUtilsMessengerEXT(this->instance, this->debugMessenger, nullptr);
     }
     else
     {
