@@ -6,6 +6,7 @@
 #include <iostream>
 #include <exception>
 #include <stdexcept>
+#include <optional>
 
 class Application
 {
@@ -13,10 +14,12 @@ public:
     void Run();
 
 private:
-    void initWindow();
-    void initVulkan();
+    void init();
     void update();
     void shutdown();
+
+    void initWindow();
+    void initVulkan();
 
     void createVulkanInstance();
 
@@ -36,6 +39,21 @@ private:
     void DestroyDebugUtilsMessengerEXT(VkInstance instance, VkDebugUtilsMessengerEXT debugMessenger, const VkAllocationCallbacks* pAllocator);
     void populateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT &createDebugInfo);
     void setupDebugMessenger();
+
+    void pickPhysicalDevice();
+    bool isDeviceSuitable(vk::PhysicalDevice device);
+
+    struct QueueFamilyIndices 
+    {
+        std::optional<uint32_t> graphicsFamily;
+
+        bool isComplete() 
+        {
+            return graphicsFamily.has_value();
+        }
+    };
+
+    QueueFamilyIndices findQueueFamilies(vk::PhysicalDevice device);
 
     GLFWwindow *window = nullptr;
 
@@ -62,4 +80,10 @@ private:
 
     VkDebugUtilsMessengerEXT debugMessenger;
     VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo{};
+
+    vk::PhysicalDevice physicalDevice = VK_NULL_HANDLE;
+    uint32_t physicalDeviceCount = 0;
+    std::vector<vk::PhysicalDevice> physicalDevices;
+    vk::PhysicalDeviceProperties physicalDeviceProperties;
+    vk::PhysicalDeviceFeatures physicalDeviceFeatures;
 };

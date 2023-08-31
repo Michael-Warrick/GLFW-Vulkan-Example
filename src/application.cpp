@@ -2,10 +2,15 @@
 
 void Application::Run()
 {
-    initWindow();
-    initVulkan();
+    init();
     update();
     shutdown();
+}
+
+void Application::init()
+{
+    initWindow();
+    initVulkan();
 }
 
 void Application::initWindow()
@@ -20,6 +25,7 @@ void Application::initVulkan()
 {
     createVulkanInstance();
     setupDebugMessenger();
+    pickPhysicalDevice();
 }
 
 void Application::update()
@@ -271,4 +277,78 @@ void Application::setupDebugMessenger()
     {
         throw std::runtime_error("failed to set up debug messenger!");
     }
+}
+
+void Application::pickPhysicalDevice()
+{
+    vk::Result result;
+
+    result = instance.enumeratePhysicalDevices(&physicalDeviceCount, nullptr);
+    if (result != vk::Result::eSuccess)
+    {
+        throw std::runtime_error("Failed to enumerate physical devices. Error code: " + vk::to_string(result));
+    }
+    
+    if (physicalDeviceCount == 0)
+    {
+        throw std::runtime_error("Failed to find a GPU with Vulkan support!");
+    }
+
+    physicalDevices = std::vector<vk::PhysicalDevice>(physicalDeviceCount);
+    result = instance.enumeratePhysicalDevices(&physicalDeviceCount, physicalDevices.data());
+    if (result != vk::Result::eSuccess)
+    {
+        throw std::runtime_error("Failed to enumerate physical devices with selected data. Error code: " + vk::to_string(result));
+    }
+
+    for (const auto &device : physicalDevices)
+    {
+        std::cout << device.getProperties().deviceName << std::endl;
+
+        if (isDeviceSuitable(device))
+        {
+            physicalDevice = device;
+            break;
+        }
+    }
+
+    if (!physicalDevice)
+    {
+        throw std::runtime_error("failed to find a suitable GPU!");
+    }
+}
+
+bool Application::isDeviceSuitable(vk::PhysicalDevice device)
+{
+    Application::QueueFamilyIndices indices = findQueueFamilies(device);
+
+    return indices.isComplete();
+}
+
+Application::QueueFamilyIndices Application::findQueueFamilies(vk::PhysicalDevice device) 
+{
+    Application::QueueFamilyIndices indices;
+    uint32_t queueFamilyCount = 0;
+
+    device.getQueueFamilyProperties(&queueFamilyCount, nullptr);
+    std::vector<vk::QueueFamilyProperties> queueFamilies(queueFamilyCount);
+    device.getQueueFamilyProperties(&queueFamilyCount, queueFamilies.data());
+
+    int i = 0;
+    for (const auto &queueFamily : queueFamilies)
+    {
+        if (queueFamily.queueFlags & vk::QueueFlagBits::eGraphics)
+        {
+            indices.graphicsFamily = i;
+        }
+
+        if (indices.isComplete())
+        {
+            break;
+        }
+        
+        i++;
+    }
+
+    return indices;
 }
