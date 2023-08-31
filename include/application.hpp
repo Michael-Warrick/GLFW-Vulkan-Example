@@ -11,6 +11,7 @@ class Application
 {
 public:
     void Run();
+
 private:
     void initWindow();
     void initVulkan();
@@ -19,22 +20,24 @@ private:
 
     void createVulkanInstance();
 
-    std::vector<const char*> getRequiredInstanceExtensions();
+    std::vector<const char *> getRequiredInstanceExtensions();
     std::vector<vk::ExtensionProperties> getAvailableInstanceExtensions();
     bool checkInstanceExtensionSupport();
     bool checkValidationLayerSupport();
 
     static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
-        vk::DebugReportFlagsEXT messageSeverity, 
-        vk::DebugReportObjectTypeEXT messageType,
-        const vk::DebugUtilsMessengerCallbackDataEXT* callbackData,
-        void* userData
+        VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
+        VkDebugUtilsMessageTypeFlagsEXT messageType,
+        const VkDebugUtilsMessengerCallbackDataEXT *pCallbackData,
+        void *pUserData
     );
 
+    VkResult CreateDebugUtilsMessengerEXT(VkInstance instance, const VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkDebugUtilsMessengerEXT* pDebugMessenger);
+    void DestroyDebugUtilsMessengerEXT(VkInstance instance, VkDebugUtilsMessengerEXT debugMessenger, const VkAllocationCallbacks* pAllocator);
+    void populateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT &createDebugInfo);
     void setupDebugMessenger();
-    void destroyDebugMessenger();
-    
-    GLFWwindow* window = nullptr;   
+
+    GLFWwindow *window = nullptr;
 
     vk::Instance instance;
     vk::InstanceCreateFlags flags;
@@ -42,8 +45,8 @@ private:
     vk::InstanceCreateInfo createInfo{};
 
     uint32_t glfwExtensionCount = 0;
-    const char** glfwExtensions = nullptr;
-    std::vector<const char*> requiredExtensions;
+    const char **glfwExtensions = nullptr;
+    std::vector<const char *> requiredExtensions;
     uint32_t extensionCount = 0;
     std::vector<vk::ExtensionProperties> availableExtensions;
 
@@ -53,10 +56,10 @@ private:
     const bool enableValidationLayers = true;
 #endif
 
-    const std::vector<const char*> validationLayers = { "VK_LAYER_KHRONOS_validation" };
+    const std::vector<const char *> validationLayers = {"VK_LAYER_KHRONOS_validation"};
     uint32_t layerCount = 0;
     std::vector<vk::LayerProperties> availableLayers;
 
-    vk::DebugUtilsMessengerEXT debugMessenger;
-    vk::DebugUtilsMessengerCreateInfoEXT debugCreateInfo{};
+    VkDebugUtilsMessengerEXT debugMessenger;
+    VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo{};
 };

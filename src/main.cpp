@@ -1,6 +1,6 @@
 #include "application.hpp"
 
-int main() 
+int main()
 {
     Application app;
     try

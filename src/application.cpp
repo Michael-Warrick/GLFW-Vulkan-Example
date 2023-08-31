@@ -19,11 +19,7 @@ void Application::initWindow()
 void Application::initVulkan()
 {
     createVulkanInstance();
-
-    if (enableValidationLayers)
-    {
-        setupDebugMessenger();
-    }
+    setupDebugMessenger();
 }
 
 void Application::update()
@@ -38,9 +34,9 @@ void Application::shutdown()
 {
     if (enableValidationLayers)
     {
-        destroyDebugMessenger();
+        DestroyDebugUtilsMessengerEXT(instance, debugMessenger, nullptr);
     }
-
+    
     instance.destroy();
 
     glfwDestroyWindow(window);
@@ -73,6 +69,12 @@ void Application::createVulkanInstance()
                      .setPpEnabledLayerNames(validationLayers.data())
                      .setEnabledExtensionCount(requiredExtensions.size())
                      .setPpEnabledExtensionNames(requiredExtensions.data());
+    
+    if (enableValidationLayers)
+    {
+        populateDebugMessengerCreateInfo(debugCreateInfo);
+        createInfo.setPNext(&debugCreateInfo);
+    }
 
     try
     {
@@ -140,6 +142,18 @@ std::vector<const char *> Application::getRequiredInstanceExtensions()
     requiredExtensions.emplace_back(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME);
     flags = vk::InstanceCreateFlags(vk::InstanceCreateFlagBits::eEnumeratePortabilityKHR);
 
+    if (enableValidationLayers)
+    {
+        requiredExtensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+    }
+
+    std::cout << "Required extensions (" << requiredExtensions.size() << "):\n";
+
+    for (const auto &extension : requiredExtensions)
+    {
+        std::cout << "\t" << extension << "\n";
+    }
+
     return requiredExtensions;
 }
 
@@ -200,14 +214,45 @@ bool Application::checkInstanceExtensionSupport()
 }
 
 VKAPI_ATTR VkBool32 VKAPI_CALL Application::debugCallback(
-    vk::DebugReportFlagsEXT messageSeverity,
-    vk::DebugReportObjectTypeEXT messageType,
-    const vk::DebugUtilsMessengerCallbackDataEXT *callbackData,
-    void *userData)
+    VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
+    VkDebugUtilsMessageTypeFlagsEXT messageType,
+    const VkDebugUtilsMessengerCallbackDataEXT *pCallbackData,
+    void *pUserData)
 {
-    std::cerr << "Validation layer: " << callbackData->pMessage << std::endl;
+    std::cerr << "validation layer: " << pCallbackData->pMessage << std::endl;
 
     return VK_FALSE;
+}
+
+VkResult Application::CreateDebugUtilsMessengerEXT(VkInstance instance, const VkDebugUtilsMessengerCreateInfoEXT *pCreateInfo, const VkAllocationCallbacks *pAllocator, VkDebugUtilsMessengerEXT *pDebugMessenger)
+{
+    auto func = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT");
+    if (func != nullptr)
+    {
+        return func(instance, pCreateInfo, pAllocator, pDebugMessenger);
+    }
+    else
+    {
+        return VK_ERROR_EXTENSION_NOT_PRESENT;
+    }
+}
+
+void Application::DestroyDebugUtilsMessengerEXT(VkInstance instance, VkDebugUtilsMessengerEXT debugMessenger, const VkAllocationCallbacks* pAllocator) 
+{
+    auto func = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkDestroyDebugUtilsMessengerEXT");
+    if (func != nullptr)
+    {
+        return func(instance, debugMessenger, pAllocator);
+    }
+}
+
+void Application::populateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT &createDebugInfo)
+{
+    createDebugInfo = {};
+    createDebugInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
+    createDebugInfo.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
+    createDebugInfo.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
+    createDebugInfo.pfnUserCallback = debugCallback;
 }
 
 void Application::setupDebugMessenger()
@@ -217,50 +262,10 @@ void Application::setupDebugMessenger()
         return;
     }
 
-    debugCreateInfo = vk::DebugUtilsMessengerCreateInfoEXT()
-                          .setMessageSeverity(
-                              vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose |
-                              vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning |
-                              vk::DebugUtilsMessageSeverityFlagBitsEXT::eError)
-                          .setMessageType(
-                              vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral |
-                              vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation |
-                              vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance)
-                          .setPfnUserCallback((PFN_vkDebugUtilsMessengerCallbackEXT)debugCallback)
-                          .setPUserData(nullptr);
+    populateDebugMessengerCreateInfo(debugCreateInfo);
 
-    auto CreateDebugUtilsMessengerEXT = (PFN_vkCreateDebugUtilsMessengerEXT)this->instance.getProcAddr("vkCreateDebugUtilsMessengerEXT");
-
-    if (CreateDebugUtilsMessengerEXT != nullptr)
+    if (CreateDebugUtilsMessengerEXT(instance, &debugCreateInfo, nullptr, &debugMessenger) != VK_SUCCESS)
     {
-        VkDebugUtilsMessengerEXT tmp;
-        const VkDebugUtilsMessengerCreateInfoEXT tmpCreateInfo = {VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT};
-        if (CreateDebugUtilsMessengerEXT(this->instance, &tmpCreateInfo, nullptr, &tmp) == VK_SUCCESS)
-        {
-            debugMessenger = tmp;
-        }
-        else
-        {
-            throw std::runtime_error("Failed to create Vulkan debug messenger.");
-        }
-    }
-    else
-    {
-        throw std::runtime_error("Cannot find required vkCreateDebugUtilsMessengerEXT function");
-    }
-
-    // debugMessenger = instance.createDebugUtilsMessengerEXT(debugCreateInfo);
-}
-
-void Application::destroyDebugMessenger()
-{
-    auto DestroyDebugUtilsMessengerEXT = (PFN_vkDestroyDebugUtilsMessengerEXT)this->instance.getProcAddr("vkDestroyDebugUtilsMessengerEXT");
-    if (DestroyDebugUtilsMessengerEXT != nullptr)
-    {
-        DestroyDebugUtilsMessengerEXT(this->instance, this->debugMessenger, nullptr);
-    }
-    else
-    {
-        std::cerr << "Failed to destroy debug callback" << std::endl;
+        throw std::runtime_error("failed to set up debug messenger!");
     }
 }
