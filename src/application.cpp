@@ -36,7 +36,7 @@ void Application::shutdown()
     {
         DestroyDebugUtilsMessengerEXT(instance, debugMessenger, nullptr);
     }
-    
+
     instance.destroy();
 
     glfwDestroyWindow(window);
@@ -69,7 +69,7 @@ void Application::createVulkanInstance()
                      .setPpEnabledLayerNames(validationLayers.data())
                      .setEnabledExtensionCount(requiredExtensions.size())
                      .setPpEnabledExtensionNames(requiredExtensions.data());
-    
+
     if (enableValidationLayers)
     {
         populateDebugMessengerCreateInfo(debugCreateInfo);
@@ -145,13 +145,13 @@ std::vector<const char *> Application::getRequiredInstanceExtensions()
     if (enableValidationLayers)
     {
         requiredExtensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
-    }
 
-    std::cout << "Required extensions (" << requiredExtensions.size() << "):\n";
+        std::cout << "Required extensions (" << requiredExtensions.size() << "):\n";
 
-    for (const auto &extension : requiredExtensions)
-    {
-        std::cout << "\t" << extension << "\n";
+        for (const auto &extension : requiredExtensions)
+        {
+            std::cout << "\t" << extension << "\n";
+        }
     }
 
     return requiredExtensions;
@@ -176,12 +176,15 @@ std::vector<vk::ExtensionProperties> Application::getAvailableInstanceExtensions
         throw std::runtime_error("Failed to enumerate instance extension properties. Error code: " + vk::to_string(result));
     }
 
-    // Print all available extensions and their names
-    std::cout << "Available extensions (" << extensionCount << "):\n";
-
-    for (const auto &extension : availableExtensions)
+    if (enableValidationLayers)
     {
-        std::cout << "\t" << extension.extensionName << "\n";
+        // Print all available extensions and their names
+        std::cout << "Available extensions (" << extensionCount << "):\n";
+
+        for (const auto &extension : availableExtensions)
+        {
+            std::cout << "\t" << extension.extensionName << "\n";
+        }
     }
 
     return availableExtensions;
@@ -237,7 +240,7 @@ VkResult Application::CreateDebugUtilsMessengerEXT(VkInstance instance, const Vk
     }
 }
 
-void Application::DestroyDebugUtilsMessengerEXT(VkInstance instance, VkDebugUtilsMessengerEXT debugMessenger, const VkAllocationCallbacks* pAllocator) 
+void Application::DestroyDebugUtilsMessengerEXT(VkInstance instance, VkDebugUtilsMessengerEXT debugMessenger, const VkAllocationCallbacks *pAllocator)
 {
     auto func = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkDestroyDebugUtilsMessengerEXT");
     if (func != nullptr)
