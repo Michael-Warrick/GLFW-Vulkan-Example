@@ -55,6 +55,10 @@ private:
 
     QueueFamilyIndices findQueueFamilies(vk::PhysicalDevice device);
 
+    void createLogicalDevice();
+
+    void createSurface();
+
     GLFWwindow *window = nullptr;
 
     vk::Instance instance;
@@ -85,5 +89,13 @@ private:
     uint32_t physicalDeviceCount = 0;
     std::vector<vk::PhysicalDevice> physicalDevices;
     vk::PhysicalDeviceProperties physicalDeviceProperties;
-    vk::PhysicalDeviceFeatures physicalDeviceFeatures;
+    vk::PhysicalDeviceFeatures physicalDeviceFeatures{};
+
+    vk::Device logicalDevice;
+    vk::DeviceQueueCreateInfo deviceQueueCreateInfo{};
+    vk::DeviceCreateInfo logicalDeviceCreateInfo{};
+    vk::Queue graphicsQueue;
+    const std::vector<const char*> logicalDeviceExtensions = {"VK_KHR_portability_subset"};
+
+    vk::SurfaceKHR surface;
 };

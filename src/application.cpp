@@ -25,7 +25,9 @@ void Application::initVulkan()
 {
     createVulkanInstance();
     setupDebugMessenger();
+    createSurface();
     pickPhysicalDevice();
+    createLogicalDevice();
 }
 
 void Application::update()
@@ -38,10 +40,14 @@ void Application::update()
 
 void Application::shutdown()
 {
+    logicalDevice.destroy();
+
     if (enableValidationLayers)
     {
         DestroyDebugUtilsMessengerEXT(instance, debugMessenger, nullptr);
     }
+
+    instance.destroySurfaceKHR(surface);
 
     instance.destroy();
 
@@ -228,7 +234,7 @@ VKAPI_ATTR VkBool32 VKAPI_CALL Application::debugCallback(
     const VkDebugUtilsMessengerCallbackDataEXT *pCallbackData,
     void *pUserData)
 {
-    std::cerr << "validation layer: " << pCallbackData->pMessage << std::endl;
+    std::cerr << "Validation layer: " << pCallbackData->pMessage << std::endl;
 
     return VK_FALSE;
 }
@@ -303,7 +309,10 @@ void Application::pickPhysicalDevice()
 
     for (const auto &device : physicalDevices)
     {
-        std::cout << device.getProperties().deviceName << std::endl;
+        if (enableValidationLayers) 
+        {
+            std::cout << "Targeted GPU: " << device.getProperties().deviceName << std::endl;
+        }
 
         if (isDeviceSuitable(device))
         {
@@ -351,4 +360,53 @@ Application::QueueFamilyIndices Application::findQueueFamilies(vk::PhysicalDevic
     }
 
     return indices;
+}
+
+void Application::createLogicalDevice() 
+{
+    QueueFamilyIndices indices = findQueueFamilies(physicalDevice);
+    float queuePriority = 1.0f;
+
+    deviceQueueCreateInfo = vk::DeviceQueueCreateInfo()
+    .setQueueFamilyIndex(indices.graphicsFamily.value())
+    .setQueueCount(1)
+    .setPQueuePriorities(&queuePriority);
+
+    logicalDeviceCreateInfo = vk::DeviceCreateInfo()
+    .setPQueueCreateInfos(&deviceQueueCreateInfo)
+    .setQueueCreateInfoCount(1)
+    .setPEnabledFeatures(&physicalDeviceFeatures)
+    .setEnabledExtensionCount(1)
+    .setPpEnabledExtensionNames(logicalDeviceExtensions.data());
+
+    if (enableValidationLayers)
+    {
+        logicalDeviceCreateInfo.setEnabledLayerCount(validationLayers.size());
+        logicalDeviceCreateInfo.setPpEnabledLayerNames(validationLayers.data());
+    }
+    else 
+    {
+        logicalDeviceCreateInfo.setEnabledLayerCount(0);
+    }
+
+    vk::Result result;
+
+    result = physicalDevice.createDevice(&logicalDeviceCreateInfo, nullptr, &logicalDevice);
+    if (result != vk::Result::eSuccess)
+    {
+        throw std::runtime_error("Failed to create logical device! Error Code: " + vk::to_string(result));
+    }
+    
+    logicalDevice.getQueue(indices.graphicsFamily.value(), 0, &graphicsQueue);
+}
+
+void Application::createSurface() 
+{
+    VkResult result;
+
+    result = glfwCreateWindowSurface(instance, window, nullptr, reinterpret_cast<VkSurfaceKHR *>(&surface));
+    if (result != VK_SUCCESS)
+    {
+        throw std::runtime_error("Failed to create surface!");
+    }
 }
