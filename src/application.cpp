@@ -294,7 +294,7 @@ void Application::pickPhysicalDevice()
     {
         throw std::runtime_error("Failed to enumerate physical devices. Error code: " + vk::to_string(result));
     }
-    
+
     if (physicalDeviceCount == 0)
     {
         throw std::runtime_error("Failed to find a GPU with Vulkan support!");
@@ -309,7 +309,7 @@ void Application::pickPhysicalDevice()
 
     for (const auto &device : physicalDevices)
     {
-        if (enableValidationLayers) 
+        if (enableValidationLayers)
         {
             std::cout << "Targeted GPU: " << device.getProperties().deviceName << std::endl;
         }
@@ -334,7 +334,7 @@ bool Application::isDeviceSuitable(vk::PhysicalDevice device)
     return indices.isComplete();
 }
 
-Application::QueueFamilyIndices Application::findQueueFamilies(vk::PhysicalDevice device) 
+Application::QueueFamilyIndices Application::findQueueFamilies(vk::PhysicalDevice device)
 {
     Application::QueueFamilyIndices indices;
     uint32_t queueFamilyCount = 0;
@@ -346,45 +346,69 @@ Application::QueueFamilyIndices Application::findQueueFamilies(vk::PhysicalDevic
     int i = 0;
     for (const auto &queueFamily : queueFamilies)
     {
-        if (queueFamily.queueFlags & vk::QueueFlagBits::eGraphics)
+        vk::Bool32 presentSupport = false;
+        
+        vk::Result result = device.getSurfaceSupportKHR(i, surface, &presentSupport);
+        if (result != vk::Result::eSuccess)
         {
-            indices.graphicsFamily = i;
+            throw std::runtime_error("Failed to physical device surface support! Error Code: " + vk::to_string(result));
+        }
+
+        if (queueFamily.queueCount > 0)
+        {
+            if (queueFamily.queueFlags & vk::QueueFlagBits::eGraphics)
+            {
+                indices.graphicsFamily = i;
+            }
+
+            if (presentSupport)
+            {
+                indices.presentFamily = i;
+            }
         }
 
         if (indices.isComplete())
         {
             break;
         }
-        
+
         i++;
     }
 
     return indices;
 }
 
-void Application::createLogicalDevice() 
+void Application::createLogicalDevice()
 {
     QueueFamilyIndices indices = findQueueFamilies(physicalDevice);
     float queuePriority = 1.0f;
 
-    deviceQueueCreateInfo = vk::DeviceQueueCreateInfo()
-    .setQueueFamilyIndex(indices.graphicsFamily.value())
-    .setQueueCount(1)
-    .setPQueuePriorities(&queuePriority);
+    std::vector<vk::DeviceQueueCreateInfo> queueFamilyCreateInfos;
+    std::set<uint32_t> uniqueQueueFamilies = {
+        indices.graphicsFamily.value(),
+        indices.presentFamily.value()};
+
+    for (uint32_t queueFamily : uniqueQueueFamilies)
+    {
+        queueFamilyCreateInfos.push_back(vk::DeviceQueueCreateInfo()
+                                             .setQueueFamilyIndex(queueFamily)
+                                             .setQueueCount(1)
+                                             .setPQueuePriorities(&queuePriority));
+    }
 
     logicalDeviceCreateInfo = vk::DeviceCreateInfo()
-    .setPQueueCreateInfos(&deviceQueueCreateInfo)
-    .setQueueCreateInfoCount(1)
-    .setPEnabledFeatures(&physicalDeviceFeatures)
-    .setEnabledExtensionCount(1)
-    .setPpEnabledExtensionNames(logicalDeviceExtensions.data());
+                                  .setPQueueCreateInfos(queueFamilyCreateInfos.data())
+                                  .setQueueCreateInfoCount(queueFamilyCreateInfos.size())
+                                  .setPEnabledFeatures(&physicalDeviceFeatures)
+                                  .setEnabledExtensionCount(logicalDeviceExtensions.size())
+                                  .setPpEnabledExtensionNames(logicalDeviceExtensions.data());
 
     if (enableValidationLayers)
     {
         logicalDeviceCreateInfo.setEnabledLayerCount(validationLayers.size());
         logicalDeviceCreateInfo.setPpEnabledLayerNames(validationLayers.data());
     }
-    else 
+    else
     {
         logicalDeviceCreateInfo.setEnabledLayerCount(0);
     }
@@ -396,11 +420,12 @@ void Application::createLogicalDevice()
     {
         throw std::runtime_error("Failed to create logical device! Error Code: " + vk::to_string(result));
     }
-    
+
     logicalDevice.getQueue(indices.graphicsFamily.value(), 0, &graphicsQueue);
+    logicalDevice.getQueue(indices.presentFamily.value(), 0, &presentQueue);
 }
 
-void Application::createSurface() 
+void Application::createSurface()
 {
     VkResult result;
 

@@ -7,6 +7,7 @@
 #include <exception>
 #include <stdexcept>
 #include <optional>
+#include <set>
 
 class Application
 {
@@ -46,10 +47,11 @@ private:
     struct QueueFamilyIndices 
     {
         std::optional<uint32_t> graphicsFamily;
+        std::optional<uint32_t> presentFamily;
 
         bool isComplete() 
         {
-            return graphicsFamily.has_value();
+            return graphicsFamily.has_value() && presentFamily.has_value();
         }
     };
 
@@ -85,7 +87,7 @@ private:
     VkDebugUtilsMessengerEXT debugMessenger;
     VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo{};
 
-    vk::PhysicalDevice physicalDevice = VK_NULL_HANDLE;
+    vk::PhysicalDevice physicalDevice;
     uint32_t physicalDeviceCount = 0;
     std::vector<vk::PhysicalDevice> physicalDevices;
     vk::PhysicalDeviceProperties physicalDeviceProperties;
@@ -98,4 +100,5 @@ private:
     const std::vector<const char*> logicalDeviceExtensions = {"VK_KHR_portability_subset"};
 
     vk::SurfaceKHR surface;
+    vk::Queue presentQueue;
 };
