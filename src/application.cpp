@@ -100,9 +100,7 @@ void Application::createVulkanInstance()
 
 bool Application::checkValidationLayerSupport()
 {
-    vk::Result result;
-
-    result = vk::enumerateInstanceLayerProperties(&layerCount, nullptr);
+    vk::Result result = vk::enumerateInstanceLayerProperties(&layerCount, nullptr);
     if (result != vk::Result::eSuccess)
     {
         throw std::runtime_error("Failed to enumerate intance layer count. Error code: " + vk::to_string(result));
@@ -172,9 +170,7 @@ std::vector<const char *> Application::getRequiredInstanceExtensions()
 std::vector<vk::ExtensionProperties> Application::getAvailableInstanceExtensions()
 {
     // Due to `vk::enumerateInstanceExtensionProperties()` being marked: "nodiscard", the return value must be handled
-    vk::Result result;
-
-    result = vk::enumerateInstanceExtensionProperties(nullptr, &extensionCount, nullptr);
+    vk::Result result = vk::enumerateInstanceExtensionProperties(nullptr, &extensionCount, nullptr);
     if (result != vk::Result::eSuccess)
     {
         throw std::runtime_error("Failed to enumerate instance extension count. Error code: " + vk::to_string(result));
@@ -287,9 +283,7 @@ void Application::setupDebugMessenger()
 
 void Application::pickPhysicalDevice()
 {
-    vk::Result result;
-
-    result = instance.enumeratePhysicalDevices(&physicalDeviceCount, nullptr);
+    vk::Result result = instance.enumeratePhysicalDevices(&physicalDeviceCount, nullptr);
     if (result != vk::Result::eSuccess)
     {
         throw std::runtime_error("Failed to enumerate physical devices. Error code: " + vk::to_string(result));
@@ -413,9 +407,7 @@ void Application::createLogicalDevice()
         logicalDeviceCreateInfo.setEnabledLayerCount(0);
     }
 
-    vk::Result result;
-
-    result = physicalDevice.createDevice(&logicalDeviceCreateInfo, nullptr, &logicalDevice);
+    vk::Result result = physicalDevice.createDevice(&logicalDeviceCreateInfo, nullptr, &logicalDevice);
     if (result != vk::Result::eSuccess)
     {
         throw std::runtime_error("Failed to create logical device! Error Code: " + vk::to_string(result));
@@ -427,9 +419,7 @@ void Application::createLogicalDevice()
 
 void Application::createSurface()
 {
-    VkResult result;
-
-    result = glfwCreateWindowSurface(instance, window, nullptr, reinterpret_cast<VkSurfaceKHR *>(&surface));
+    VkResult result = glfwCreateWindowSurface(instance, window, nullptr, reinterpret_cast<VkSurfaceKHR *>(&surface));
     if (result != VK_SUCCESS)
     {
         throw std::runtime_error("Failed to create surface!");
