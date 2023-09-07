@@ -61,6 +61,8 @@ private:
 
     void createSurface();
 
+    bool checkDeviceExtensionSupport(vk::PhysicalDevice device);
+
     GLFWwindow *window = nullptr;
 
     vk::Instance instance;
@@ -97,8 +99,15 @@ private:
     vk::DeviceQueueCreateInfo deviceQueueCreateInfo{};
     vk::DeviceCreateInfo logicalDeviceCreateInfo{};
     vk::Queue graphicsQueue;
-    const std::vector<const char*> logicalDeviceExtensions = {"VK_KHR_portability_subset"};
+    const std::vector<const char*> logicalDeviceExtensions = {"VK_KHR_portability_subset", "VK_KHR_swapchain"};
 
     vk::SurfaceKHR surface;
     vk::Queue presentQueue;
+
+    struct SwapChainSupportDetails 
+    {
+        vk::SurfaceCapabilitiesKHR capabilities;
+        std::vector<vk::SurfaceFormatKHR> formats;
+        std::vector<vk::PresentModeKHR> presentModes;
+    };
 };

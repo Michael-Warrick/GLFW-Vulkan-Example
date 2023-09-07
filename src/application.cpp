@@ -321,9 +321,30 @@ void Application::pickPhysicalDevice()
     }
 }
 
+bool Application::checkDeviceExtensionSupport(vk::PhysicalDevice device) 
+{
+    uint32_t deviceExtensionCount;
+    vk::Result result = device.enumerateDeviceExtensionProperties(nullptr, &deviceExtensionCount, nullptr);
+
+    std::vector<vk::ExtensionProperties> availableDeviceExtensions(deviceExtensionCount);
+    result = device.enumerateDeviceExtensionProperties(nullptr, &deviceExtensionCount, availableDeviceExtensions.data());
+
+    std::set<std::string> requiredDeviceExtensions(logicalDeviceExtensions.begin(), logicalDeviceExtensions.end());
+
+    for (const auto& deviceExtension : availableDeviceExtensions)
+    {
+        requiredDeviceExtensions.erase(deviceExtension.extensionName);
+    }
+    
+
+    return requiredDeviceExtensions.empty();
+}
+
 bool Application::isDeviceSuitable(vk::PhysicalDevice device)
 {
     Application::QueueFamilyIndices indices = findQueueFamilies(device);
+
+    bool extensionsSupported = checkDeviceExtensionSupport(device);
 
     return indices.isComplete();
 }
