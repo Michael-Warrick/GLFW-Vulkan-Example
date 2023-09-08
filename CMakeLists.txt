@@ -52,6 +52,6 @@ target_link_libraries(${PROJECT_NAME}
 # Add the VK_ICD_FILENAMES and VK_LAYER_PATH environment variables as compile definitions
 target_compile_definitions(${PROJECT_NAME}
   PRIVATE
-  # VK_ICD_FILENAMES="${VULKAN_ICD_FILENAMES}"
+  VK_ICD_FILENAMES="${VULKAN_ICD_FILENAMES}"
   VK_LAYER_PATH="${VULKAN_LAYER_PATH}"
 )
