@@ -18,6 +18,12 @@ if(APPLE)
   set(VULKAN_LAYER_PATH "$ENV{VULKAN_SDK}/share/vulkan/explicit_layer.d")
 endif()
 
+if(UNIX AND NOT APPLE)
+  set(VULKAN_INCLUDE_DIR "/home/michael/VulkanSDK/1.3.261.1/x86_64/include")
+  set(VULKAN_LIBRARY "/home/michael/VulkanSDK/1.3.261.1/x86_64/lib/libvulkan.so.1.3.261")
+  set(VULKAN_LAYER_PATH "/home/michael/VulkanSDK/1.3.261.1/x86_64/etc/vulkan/explicit_layer.d")
+endif()
+
 add_subdirectory(vendor/glfw)
 add_subdirectory(vendor/glm)
 
@@ -46,6 +52,6 @@ target_link_libraries(${PROJECT_NAME}
 # Add the VK_ICD_FILENAMES and VK_LAYER_PATH environment variables as compile definitions
 target_compile_definitions(${PROJECT_NAME}
   PRIVATE
-  VK_ICD_FILENAMES="${VULKAN_ICD_FILENAMES}"
+  # VK_ICD_FILENAMES="${VULKAN_ICD_FILENAMES}"
   VK_LAYER_PATH="${VULKAN_LAYER_PATH}"
 )
