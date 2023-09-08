@@ -99,7 +99,12 @@ private:
     vk::DeviceQueueCreateInfo deviceQueueCreateInfo{};
     vk::DeviceCreateInfo logicalDeviceCreateInfo{};
     vk::Queue graphicsQueue;
+    
+#ifdef __APPLE__
     const std::vector<const char*> logicalDeviceExtensions = {"VK_KHR_portability_subset", "VK_KHR_swapchain"};
+#else
+    const std::vector<const char*> logicalDeviceExtensions = {"VK_KHR_swapchain"};
+#endif
 
     vk::SurfaceKHR surface;
     vk::Queue presentQueue;
