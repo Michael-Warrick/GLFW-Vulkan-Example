@@ -8,6 +8,8 @@
 #include <stdexcept>
 #include <optional>
 #include <set>
+#include <limits>
+#include <algorithm>
 
 class Application
 {
@@ -15,6 +17,24 @@ public:
     void Run();
 
 private:
+    struct QueueFamilyIndices
+    {
+        std::optional<uint32_t> graphicsFamily;
+        std::optional<uint32_t> presentFamily;
+
+        bool isComplete()
+        {
+            return graphicsFamily.has_value() && presentFamily.has_value();
+        }
+    };
+
+    struct SwapChainSupportDetails
+    {
+        vk::SurfaceCapabilitiesKHR capabilities;
+        std::vector<vk::SurfaceFormatKHR> formats;
+        std::vector<vk::PresentModeKHR> presentModes;
+    };
+
     void init();
     void update();
     void shutdown();
@@ -33,27 +53,15 @@ private:
         VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
         VkDebugUtilsMessageTypeFlagsEXT messageType,
         const VkDebugUtilsMessengerCallbackDataEXT *pCallbackData,
-        void *pUserData
-    );
+        void *pUserData);
 
-    VkResult CreateDebugUtilsMessengerEXT(VkInstance instance, const VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkDebugUtilsMessengerEXT* pDebugMessenger);
-    void DestroyDebugUtilsMessengerEXT(VkInstance instance, VkDebugUtilsMessengerEXT debugMessenger, const VkAllocationCallbacks* pAllocator);
+    VkResult CreateDebugUtilsMessengerEXT(VkInstance instance, const VkDebugUtilsMessengerCreateInfoEXT *pCreateInfo, const VkAllocationCallbacks *pAllocator, VkDebugUtilsMessengerEXT *pDebugMessenger);
+    void DestroyDebugUtilsMessengerEXT(VkInstance instance, VkDebugUtilsMessengerEXT debugMessenger, const VkAllocationCallbacks *pAllocator);
     void populateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT &createDebugInfo);
     void setupDebugMessenger();
 
     void pickPhysicalDevice();
     bool isDeviceSuitable(vk::PhysicalDevice device);
-
-    struct QueueFamilyIndices 
-    {
-        std::optional<uint32_t> graphicsFamily;
-        std::optional<uint32_t> presentFamily;
-
-        bool isComplete() 
-        {
-            return graphicsFamily.has_value() && presentFamily.has_value();
-        }
-    };
 
     QueueFamilyIndices findQueueFamilies(vk::PhysicalDevice device);
 
@@ -62,6 +70,11 @@ private:
     void createSurface();
 
     bool checkDeviceExtensionSupport(vk::PhysicalDevice device);
+    SwapChainSupportDetails querySwapChainSupport(vk::PhysicalDevice device);
+    vk::SurfaceFormatKHR chooseSwapSurfaceFormat(const std::vector<vk::SurfaceFormatKHR> &availableFormats);
+    vk::PresentModeKHR chooseSwapPresentMode(const std::vector<vk::PresentModeKHR> &availablePresentModes);
+    vk::Extent2D chooseSwapExtent(const vk::SurfaceCapabilitiesKHR &capabilities);
+    void createSwapChain();
 
     GLFWwindow *window = nullptr;
 
@@ -99,20 +112,18 @@ private:
     vk::DeviceQueueCreateInfo deviceQueueCreateInfo{};
     vk::DeviceCreateInfo logicalDeviceCreateInfo{};
     vk::Queue graphicsQueue;
-    
+
 #ifdef __APPLE__
-    const std::vector<const char*> logicalDeviceExtensions = {"VK_KHR_portability_subset", "VK_KHR_swapchain"};
+    const std::vector<const char *> logicalDeviceExtensions = {"VK_KHR_portability_subset", "VK_KHR_swapchain"};
 #else
-    const std::vector<const char*> logicalDeviceExtensions = {"VK_KHR_swapchain"};
+    const std::vector<const char *> logicalDeviceExtensions = {"VK_KHR_swapchain"};
 #endif
 
     vk::SurfaceKHR surface;
     vk::Queue presentQueue;
 
-    struct SwapChainSupportDetails 
-    {
-        vk::SurfaceCapabilitiesKHR capabilities;
-        std::vector<vk::SurfaceFormatKHR> formats;
-        std::vector<vk::PresentModeKHR> presentModes;
-    };
+    vk::SwapchainKHR swapChain;
+    std::vector<vk::Image> swapChainImages;
+    vk::Format swapChainImageFormat;
+    vk::Extent2D swapChainExtent;
 };
