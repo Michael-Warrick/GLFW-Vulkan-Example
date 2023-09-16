@@ -13,7 +13,7 @@ endif()
 
 if(APPLE)
   set(VULKAN_INCLUDE_DIR "$ENV{VULKAN_SDK}/include")
-  set(VULKAN_LIBRARY "$ENV{VULKAN_SDK}/lib/libvulkan.1.3.250.dylib")
+  set(VULKAN_LIBRARY "$ENV{VULKAN_SDK}/lib/libvulkan.1.3.261.dylib")
   set(VULKAN_ICD_FILENAMES "$ENV{VULKAN_SDK}/share/vulkan/icd.d/MoltenVK_icd.json")
   set(VULKAN_LAYER_PATH "$ENV{VULKAN_SDK}/share/vulkan/explicit_layer.d")
 endif()

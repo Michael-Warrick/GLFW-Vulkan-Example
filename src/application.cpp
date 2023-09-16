@@ -29,6 +29,7 @@ void Application::initVulkan()
     pickPhysicalDevice();
     createLogicalDevice();
     createSwapChain();
+    createImageViews();
 }
 
 void Application::update()
@@ -41,6 +42,11 @@ void Application::update()
 
 void Application::shutdown()
 {
+    for (auto imageView : swapChainImageViews)
+    {
+        logicalDevice.destroyImageView(imageView);
+    }
+    
     logicalDevice.destroySwapchainKHR(swapChain);
     logicalDevice.destroy();
 
@@ -531,7 +537,7 @@ vk::PresentModeKHR Application::chooseSwapPresentMode(const std::vector<vk::Pres
 }
 
 vk::Extent2D Application::chooseSwapExtent(const vk::SurfaceCapabilitiesKHR &capabilities)
-{   
+{
     if (capabilities.currentExtent.width != std::numeric_limits<uint32_t>::max())
     {
         return capabilities.currentExtent;
@@ -594,16 +600,15 @@ void Application::createSwapChain()
         swapChainCreateInfo.setQueueFamilyIndexCount(0);
         swapChainCreateInfo.setPQueueFamilyIndices(nullptr);
     }
-    
+
     vk::Result result = logicalDevice.createSwapchainKHR(&swapChainCreateInfo, nullptr, &swapChain);
-    
-    
+
     result = logicalDevice.getSwapchainImagesKHR(swapChain, &imageCount, nullptr);
     if (result != vk::Result::eSuccess)
     {
         throw std::runtime_error("Failed to get swap chain images! Error Code: " + vk::to_string(result));
     }
-    
+
     swapChainImages.resize(imageCount);
 
     result = logicalDevice.getSwapchainImagesKHR(swapChain, &imageCount, swapChainImages.data());
@@ -614,4 +619,25 @@ void Application::createSwapChain()
 
     swapChainImageFormat = surfaceFormat.format;
     swapChainExtent = extent;
+}
+
+void Application::createImageViews()
+{
+    swapChainImageViews.resize(swapChainImages.size());
+
+    for (size_t i = 0; i < swapChainImages.size(); i++)
+    {
+        vk::ImageViewCreateInfo imageViewCreateInfo = vk::ImageViewCreateInfo()
+                                                          .setImage(swapChainImages[i])
+                                                          .setViewType(vk::ImageViewType::e2D)
+                                                          .setFormat(swapChainImageFormat)
+                                                          .setComponents(vk::ComponentMapping(vk::ComponentSwizzle::eIdentity, vk::ComponentSwizzle::eIdentity, vk::ComponentSwizzle::eIdentity, vk::ComponentSwizzle::eIdentity))
+                                                          .setSubresourceRange(vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1));
+
+        vk::Result result = logicalDevice.createImageView(&imageViewCreateInfo, nullptr, &swapChainImageViews[i]);
+        if (result != vk::Result::eSuccess)
+        {
+            throw std::runtime_error("Failed to create image views! Error Code: " + vk::to_string(result));
+        }
+    }
 }

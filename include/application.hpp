@@ -76,6 +76,8 @@ private:
     vk::Extent2D chooseSwapExtent(const vk::SurfaceCapabilitiesKHR &capabilities);
     void createSwapChain();
 
+    void createImageViews();
+
     GLFWwindow *window = nullptr;
 
     vk::Instance instance;
@@ -126,4 +128,6 @@ private:
     std::vector<vk::Image> swapChainImages;
     vk::Format swapChainImageFormat;
     vk::Extent2D swapChainExtent;
+
+    std::vector<vk::ImageView> swapChainImageViews;
 };
