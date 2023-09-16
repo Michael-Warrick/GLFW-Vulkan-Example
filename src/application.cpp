@@ -30,6 +30,7 @@ void Application::initVulkan()
     createLogicalDevice();
     createSwapChain();
     createImageViews();
+    createGraphicsPipeline();
 }
 
 void Application::update()
@@ -46,7 +47,7 @@ void Application::shutdown()
     {
         logicalDevice.destroyImageView(imageView);
     }
-    
+
     logicalDevice.destroySwapchainKHR(swapChain);
     logicalDevice.destroy();
 
@@ -315,7 +316,7 @@ void Application::pickPhysicalDevice()
     {
         if (enableValidationLayers)
         {
-            std::cout << "Targeted GPU: " << device.getProperties().deviceName << std::endl;
+            std::cout << "Targeted GPU: \n\t" << device.getProperties().deviceName << std::endl;
         }
 
         if (isDeviceSuitable(device))
@@ -640,4 +641,60 @@ void Application::createImageViews()
             throw std::runtime_error("Failed to create image views! Error Code: " + vk::to_string(result));
         }
     }
+}
+
+void Application::createGraphicsPipeline()
+{
+    auto vertexShaderCode = readFile("resources/shaders/compiled/vert.spv");
+    auto fragmentShaderCode = readFile("resources/shaders/compiled/frag.spv");
+
+    vk::ShaderModule vertexShaderModule = createShaderModule(vertexShaderCode);
+    vk::ShaderModule fragmentShaderModule = createShaderModule(fragmentShaderCode);
+
+    vk::PipelineShaderStageCreateInfo vertexShaderStageCreateInfo = vk::PipelineShaderStageCreateInfo()
+                                                                        .setStage(vk::ShaderStageFlagBits::eVertex)
+                                                                        .setModule(vertexShaderModule)
+                                                                        .setPName("main");
+    vk::PipelineShaderStageCreateInfo fragmentShaderStageCreateInfo = vk::PipelineShaderStageCreateInfo()
+                                                                          .setStage(vk::ShaderStageFlagBits::eFragment)
+                                                                          .setModule(fragmentShaderModule)
+                                                                          .setPName("main");
+    vk::PipelineShaderStageCreateInfo shaderStages[] = {vertexShaderStageCreateInfo, fragmentShaderStageCreateInfo};
+
+    logicalDevice.destroyShaderModule(fragmentShaderModule);
+    logicalDevice.destroyShaderModule(vertexShaderModule);
+}
+
+std::vector<char> Application::readFile(const std::string &fileName)
+{
+    std::ifstream file(fileName, std::ios::ate | std::ios::binary);
+    if (!file.is_open())
+    {
+        throw std::runtime_error("Failed to open file!");
+    }
+
+    size_t fileSize = (size_t)file.tellg();
+    std::vector<char> buffer(fileSize);
+
+    file.seekg(0);
+    file.read(buffer.data(), fileSize);
+    file.close();
+
+    return buffer;
+}
+
+vk::ShaderModule Application::createShaderModule(const std::vector<char> &code)
+{
+    vk::ShaderModuleCreateInfo shaderModuleCreateInfo = vk::ShaderModuleCreateInfo()
+                                                            .setCodeSize(code.size())
+                                                            .setPCode(reinterpret_cast<const uint32_t *>(code.data()));
+
+    vk::ShaderModule shaderModule;
+    vk::Result result = logicalDevice.createShaderModule(&shaderModuleCreateInfo, nullptr, &shaderModule);
+    if (result != vk::Result::eSuccess)
+    {
+        throw std::runtime_error("Failed to create shader module! Error Code: " + vk::to_string(result));
+    }
+
+    return shaderModule;
 }

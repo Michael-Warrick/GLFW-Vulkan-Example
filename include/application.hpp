@@ -10,6 +10,7 @@
 #include <set>
 #include <limits>
 #include <algorithm>
+#include <fstream>
 
 class Application
 {
@@ -77,6 +78,10 @@ private:
     void createSwapChain();
 
     void createImageViews();
+
+    void createGraphicsPipeline();
+    static std::vector<char> readFile(const std::string &fileName);
+    vk::ShaderModule createShaderModule(const std::vector<char> &code);
 
     GLFWwindow *window = nullptr;
 
