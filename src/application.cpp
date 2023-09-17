@@ -43,6 +43,8 @@ void Application::update()
 
 void Application::shutdown()
 {
+    logicalDevice.destroyPipelineLayout(pipelineLayout);
+
     for (auto imageView : swapChainImageViews)
     {
         logicalDevice.destroyImageView(imageView);
@@ -661,6 +663,77 @@ void Application::createGraphicsPipeline()
                                                                           .setPName("main");
     vk::PipelineShaderStageCreateInfo shaderStages[] = {vertexShaderStageCreateInfo, fragmentShaderStageCreateInfo};
 
+    vk::PipelineVertexInputStateCreateInfo vertexInputCreateInfo = vk::PipelineVertexInputStateCreateInfo()
+                                                                       .setVertexBindingDescriptionCount(0)
+                                                                       .setPVertexBindingDescriptions(nullptr)
+                                                                       .setVertexAttributeDescriptionCount(0)
+                                                                       .setPVertexAttributeDescriptions(nullptr);
+
+    vk::PipelineInputAssemblyStateCreateInfo inputAssemblyCreateInfo = vk::PipelineInputAssemblyStateCreateInfo()
+                                                                           .setTopology(vk::PrimitiveTopology::eTriangleList)
+                                                                           .setPrimitiveRestartEnable(VK_FALSE);
+
+    vk::PipelineViewportStateCreateInfo viewportStateCreateInfo = vk::PipelineViewportStateCreateInfo()
+                                                                      .setViewportCount(1)
+                                                                      .setScissorCount(1);
+
+    vk::PipelineRasterizationStateCreateInfo rasterizerCreateInfo = vk::PipelineRasterizationStateCreateInfo()
+                                                                        .setDepthClampEnable(VK_FALSE)
+                                                                        .setRasterizerDiscardEnable(VK_FALSE)
+                                                                        .setPolygonMode(vk::PolygonMode::eFill)
+                                                                        .setLineWidth(1.0f)
+                                                                        .setCullMode(vk::CullModeFlagBits::eBack)
+                                                                        .setFrontFace(vk::FrontFace::eClockwise)
+                                                                        .setDepthBiasEnable(VK_FALSE)
+                                                                        .setDepthBiasConstantFactor(0.0f)
+                                                                        .setDepthBiasClamp(0.0f)
+                                                                        .setDepthBiasSlopeFactor(0.0f);
+
+    vk::PipelineMultisampleStateCreateInfo multisamplingCreateInfo = vk::PipelineMultisampleStateCreateInfo()
+                                                                         .setSampleShadingEnable(VK_FALSE)
+                                                                         .setRasterizationSamples(vk::SampleCountFlagBits::e1)
+                                                                         .setMinSampleShading(1.0f)
+                                                                         .setPSampleMask(nullptr)
+                                                                         .setAlphaToCoverageEnable(VK_FALSE)
+                                                                         .setAlphaToOneEnable(VK_FALSE);
+
+    vk::PipelineColorBlendAttachmentState colorBlendAttachmentState = vk::PipelineColorBlendAttachmentState()
+                                                                          .setColorWriteMask(vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG | vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA)
+                                                                          .setBlendEnable(VK_FALSE)
+                                                                          .setSrcColorBlendFactor(vk::BlendFactor::eOne)
+                                                                          .setDstColorBlendFactor(vk::BlendFactor::eZero)
+                                                                          .setColorBlendOp(vk::BlendOp::eAdd)
+                                                                          .setSrcAlphaBlendFactor(vk::BlendFactor::eOne)
+                                                                          .setDstAlphaBlendFactor(vk::BlendFactor::eZero)
+                                                                          .setAlphaBlendOp(vk::BlendOp::eAdd);
+
+    vk::PipelineColorBlendStateCreateInfo colorBlendingCreateInfo = vk::PipelineColorBlendStateCreateInfo()
+                                                                        .setLogicOpEnable(VK_FALSE)
+                                                                        .setLogicOp(vk::LogicOp::eCopy)
+                                                                        .setAttachmentCount(1)
+                                                                        .setPAttachments(&colorBlendAttachmentState)
+                                                                        .setBlendConstants({0.0f, 0.0f, 0.0f, 0.0f});
+
+    std::vector<vk::DynamicState> dynamicStates = {
+        vk::DynamicState::eViewport,
+        vk::DynamicState::eScissor};
+
+    vk::PipelineDynamicStateCreateInfo dynamicStateCreateInfo = vk::PipelineDynamicStateCreateInfo()
+                                                                    .setDynamicStateCount(static_cast<uint32_t>(dynamicStates.size()))
+                                                                    .setPDynamicStates(dynamicStates.data());
+
+    vk::PipelineLayoutCreateInfo pipelineLayoutCreateInfo = vk::PipelineLayoutCreateInfo()
+                                                                .setSetLayoutCount(0)
+                                                                .setPSetLayouts(nullptr)
+                                                                .setPushConstantRangeCount(0)
+                                                                .setPPushConstantRanges(nullptr);
+
+    vk::Result result = logicalDevice.createPipelineLayout(&pipelineLayoutCreateInfo, nullptr, &pipelineLayout);
+    if (result != vk::Result::eSuccess)
+    {
+        throw std::runtime_error("Failed to create pipeline layout! Error Code: " + vk::to_string(result));
+    }
+    
     logicalDevice.destroyShaderModule(fragmentShaderModule);
     logicalDevice.destroyShaderModule(vertexShaderModule);
 }

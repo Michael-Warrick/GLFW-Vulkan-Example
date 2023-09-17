@@ -135,4 +135,6 @@ private:
     vk::Extent2D swapChainExtent;
 
     std::vector<vk::ImageView> swapChainImageViews;
+
+    vk::PipelineLayout pipelineLayout;
 };
