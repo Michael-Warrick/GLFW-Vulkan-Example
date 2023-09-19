@@ -83,6 +83,8 @@ private:
     static std::vector<char> readFile(const std::string &fileName);
     vk::ShaderModule createShaderModule(const std::vector<char> &code);
 
+    void createRenderPass();
+
     GLFWwindow *window = nullptr;
 
     vk::Instance instance;
@@ -135,6 +137,8 @@ private:
     vk::Extent2D swapChainExtent;
 
     std::vector<vk::ImageView> swapChainImageViews;
+
+    vk::RenderPass renderPass;
 
     vk::PipelineLayout pipelineLayout;
 };

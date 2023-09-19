@@ -30,6 +30,7 @@ void Application::initVulkan()
     createLogicalDevice();
     createSwapChain();
     createImageViews();
+    createRenderPass();
     createGraphicsPipeline();
 }
 
@@ -44,6 +45,7 @@ void Application::update()
 void Application::shutdown()
 {
     logicalDevice.destroyPipelineLayout(pipelineLayout);
+    logicalDevice.destroyRenderPass(renderPass);
 
     for (auto imageView : swapChainImageViews)
     {
@@ -733,7 +735,7 @@ void Application::createGraphicsPipeline()
     {
         throw std::runtime_error("Failed to create pipeline layout! Error Code: " + vk::to_string(result));
     }
-    
+
     logicalDevice.destroyShaderModule(fragmentShaderModule);
     logicalDevice.destroyShaderModule(vertexShaderModule);
 }
@@ -770,4 +772,38 @@ vk::ShaderModule Application::createShaderModule(const std::vector<char> &code)
     }
 
     return shaderModule;
+}
+
+void Application::createRenderPass()
+{
+    vk::AttachmentDescription colorAttachment = vk::AttachmentDescription()
+                                                    .setFormat(swapChainImageFormat)
+                                                    .setSamples(vk::SampleCountFlagBits::e1)
+                                                    .setLoadOp(vk::AttachmentLoadOp::eClear)
+                                                    .setStoreOp(vk::AttachmentStoreOp::eStore)
+                                                    .setStencilLoadOp(vk::AttachmentLoadOp::eDontCare)
+                                                    .setStencilStoreOp(vk::AttachmentStoreOp::eDontCare)
+                                                    .setInitialLayout(vk::ImageLayout::eUndefined)
+                                                    .setFinalLayout(vk::ImageLayout::ePresentSrcKHR);
+
+    vk::AttachmentReference colorAttachmentReference = vk::AttachmentReference()
+                                                           .setAttachment(0)
+                                                           .setLayout(vk::ImageLayout::eColorAttachmentOptimal);
+
+    vk::SubpassDescription subpass = vk::SubpassDescription()
+                                         .setPipelineBindPoint(vk::PipelineBindPoint::eGraphics)
+                                         .setColorAttachmentCount(1)
+                                         .setPColorAttachments(&colorAttachmentReference);
+
+    vk::RenderPassCreateInfo renderPassCreateInfo = vk::RenderPassCreateInfo()
+                                                        .setAttachmentCount(1)
+                                                        .setPAttachments(&colorAttachment)
+                                                        .setSubpassCount(1)
+                                                        .setPSubpasses(&subpass);
+
+    vk::Result result = logicalDevice.createRenderPass(&renderPassCreateInfo, nullptr, &renderPass);
+    if (result != vk::Result::eSuccess)
+    {
+        throw std::runtime_error("Failed to create render pass! Error Code: " + vk::to_string(result));
+    }
 }
