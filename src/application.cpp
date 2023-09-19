@@ -44,6 +44,7 @@ void Application::update()
 
 void Application::shutdown()
 {
+    logicalDevice.destroyPipeline(graphicsPipeline);
     logicalDevice.destroyPipelineLayout(pipelineLayout);
     logicalDevice.destroyRenderPass(renderPass);
 
@@ -734,6 +735,29 @@ void Application::createGraphicsPipeline()
     if (result != vk::Result::eSuccess)
     {
         throw std::runtime_error("Failed to create pipeline layout! Error Code: " + vk::to_string(result));
+    }
+
+    vk::GraphicsPipelineCreateInfo pipelineCreateInfo = vk::GraphicsPipelineCreateInfo()
+                                                            .setStageCount(2)
+                                                            .setPStages(shaderStages)
+                                                            .setPVertexInputState(&vertexInputCreateInfo)
+                                                            .setPInputAssemblyState(&inputAssemblyCreateInfo)
+                                                            .setPViewportState(&viewportStateCreateInfo)
+                                                            .setPRasterizationState(&rasterizerCreateInfo)
+                                                            .setPMultisampleState(&multisamplingCreateInfo)
+                                                            .setPDepthStencilState(nullptr)
+                                                            .setPColorBlendState(&colorBlendingCreateInfo)
+                                                            .setPDynamicState(&dynamicStateCreateInfo)
+                                                            .setLayout(pipelineLayout)
+                                                            .setRenderPass(renderPass)
+                                                            .setSubpass(0)
+                                                            .setBasePipelineHandle(VK_NULL_HANDLE)
+                                                            .setBasePipelineIndex(-1);
+
+    result = logicalDevice.createGraphicsPipelines(VK_NULL_HANDLE, 1, &pipelineCreateInfo, nullptr, &graphicsPipeline);
+    if (result != vk::Result::eSuccess)
+    {
+        throw std::runtime_error("Failed to create graphics pipeline! Error Code: " + vk::to_string(result));
     }
 
     logicalDevice.destroyShaderModule(fragmentShaderModule);

@@ -141,4 +141,6 @@ private:
     vk::RenderPass renderPass;
 
     vk::PipelineLayout pipelineLayout;
+
+    vk::Pipeline graphicsPipeline;
 };
