@@ -32,6 +32,9 @@ void Application::initVulkan()
     createImageViews();
     createRenderPass();
     createGraphicsPipeline();
+    createFramebuffers();
+    createCommandPool();
+    createCommandBuffer();
 }
 
 void Application::update()
@@ -44,6 +47,13 @@ void Application::update()
 
 void Application::shutdown()
 {
+    logicalDevice.destroyCommandPool(commandPool);
+
+    for (auto framebuffer : swapChainFrameBuffers)
+    {
+        logicalDevice.destroyFramebuffer(framebuffer);
+    }
+
     logicalDevice.destroyPipeline(graphicsPipeline);
     logicalDevice.destroyPipelineLayout(pipelineLayout);
     logicalDevice.destroyRenderPass(renderPass);
@@ -830,4 +840,98 @@ void Application::createRenderPass()
     {
         throw std::runtime_error("Failed to create render pass! Error Code: " + vk::to_string(result));
     }
+}
+
+void Application::createFramebuffers()
+{
+    swapChainFrameBuffers.resize(swapChainImageViews.size());
+
+    for (size_t i = 0; i < swapChainImageViews.size(); i++)
+    {
+        vk::ImageView attachments[] = {swapChainImageViews[i]};
+
+        vk::FramebufferCreateInfo framebufferCreateInfo = vk::FramebufferCreateInfo()
+                                                              .setRenderPass(renderPass)
+                                                              .setAttachmentCount(1)
+                                                              .setPAttachments(attachments)
+                                                              .setWidth(swapChainExtent.width)
+                                                              .setHeight(swapChainExtent.height)
+                                                              .setLayers(1);
+
+        vk::Result result = logicalDevice.createFramebuffer(&framebufferCreateInfo, nullptr, &swapChainFrameBuffers[i]);
+        if (result != vk::Result::eSuccess)
+        {
+            throw std::runtime_error("Failed to create framebuffer! Error Code: " + vk::to_string(result));
+        }
+    }
+}
+
+void Application::createCommandPool()
+{
+    QueueFamilyIndices queueFamilyIndices = findQueueFamilies(physicalDevice);
+
+    vk::CommandPoolCreateInfo commandPoolCreateInfo = vk::CommandPoolCreateInfo()
+                                                          .setFlags(vk::CommandPoolCreateFlagBits::eResetCommandBuffer)
+                                                          .setQueueFamilyIndex(queueFamilyIndices.graphicsFamily.value());
+
+    vk::Result result = logicalDevice.createCommandPool(&commandPoolCreateInfo, nullptr, &commandPool);
+    if (result != vk::Result::eSuccess)
+    {
+        throw std::runtime_error("Failed to create command pool! Error Code: " + vk::to_string(result));
+    }
+}
+
+void Application::createCommandBuffer()
+{
+    vk::CommandBufferAllocateInfo allocateCreateInfo = vk::CommandBufferAllocateInfo()
+                                                           .setCommandPool(commandPool)
+                                                           .setLevel(vk::CommandBufferLevel::ePrimary)
+                                                           .setCommandBufferCount(1);
+
+    vk::Result result = logicalDevice.allocateCommandBuffers(&allocateCreateInfo, &commandBuffer);
+    if (result != vk::Result::eSuccess)
+    {
+        throw std::runtime_error("Failed to allocate command buffers! Error Code: " + vk::to_string(result));
+    }
+}
+
+void Application::recordCommandBuffer(vk::CommandBuffer commandBuffer, uint32_t imageIndex)
+{
+    vk::CommandBufferBeginInfo beginCreateInfo = vk::CommandBufferBeginInfo();
+
+    vk::Result result = commandBuffer.begin(&beginCreateInfo);
+    if (result != vk::Result::eSuccess)
+    {
+        throw std::runtime_error("Failed to allocate command buffers! Error Code: " + vk::to_string(result));
+    }
+
+    vk::ClearValue clearColor = {{0.0f, 0.0f, 0.0f, 1.0f}};
+    vk::RenderPassBeginInfo renderPassBeginCreateInfo = vk::RenderPassBeginInfo()
+                                                            .setRenderPass(renderPass)
+                                                            .setFramebuffer(swapChainFrameBuffers[imageIndex])
+                                                            .setRenderArea(vk::Rect2D({0, 0}, swapChainExtent))
+                                                            .setClearValueCount(1)
+                                                            .setPClearValues(&clearColor);
+
+    commandBuffer.beginRenderPass(&renderPassBeginCreateInfo, vk::SubpassContents::eInline);
+    commandBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, graphicsPipeline);
+
+    vk::Viewport viewport = vk::Viewport()
+                                .setX(0.0f)
+                                .setY(0.0f)
+                                .setWidth((float)swapChainExtent.width)
+                                .setHeight((float)swapChainExtent.height)
+                                .setMinDepth(0.0f)
+                                .setMaxDepth(1.0f);
+    commandBuffer.setViewport(0, 1, &viewport);
+
+    vk::Rect2D scissor = vk::Rect2D()
+                             .setOffset({0, 0})
+                             .setExtent(swapChainExtent);
+    commandBuffer.setScissor(0, 1, &scissor);
+
+    commandBuffer.draw(3, 1, 0, 0);
+
+    commandBuffer.endRenderPass();
+    commandBuffer.end();
 }
