@@ -35,6 +35,7 @@ void Application::initVulkan()
     createFramebuffers();
     createCommandPool();
     createCommandBuffer();
+    createSyncObjects();
 }
 
 void Application::update()
@@ -42,11 +43,18 @@ void Application::update()
     while (!glfwWindowShouldClose(window))
     {
         glfwPollEvents();
+        drawFrame();
     }
+
+    logicalDevice.waitIdle();
 }
 
 void Application::shutdown()
 {
+    logicalDevice.destroySemaphore(imageAvailableSemaphore);
+    logicalDevice.destroySemaphore(renderFinishedSemaphore);
+    logicalDevice.destroyFence(inFlightFence);
+
     logicalDevice.destroyCommandPool(commandPool);
 
     for (auto framebuffer : swapChainFrameBuffers)
@@ -829,11 +837,21 @@ void Application::createRenderPass()
                                          .setColorAttachmentCount(1)
                                          .setPColorAttachments(&colorAttachmentReference);
 
+    vk::SubpassDependency subpassDependency = vk::SubpassDependency()
+                                                  .setSrcSubpass(vk::SubpassExternal)
+                                                  .setDstSubpass(0)
+                                                  .setSrcStageMask(vk::PipelineStageFlagBits::eColorAttachmentOutput)
+                                                  .setSrcAccessMask(vk::AccessFlagBits::eNone)
+                                                  .setDstStageMask(vk::PipelineStageFlagBits::eColorAttachmentOutput)
+                                                  .setDstAccessMask(vk::AccessFlagBits::eColorAttachmentWrite);
+
     vk::RenderPassCreateInfo renderPassCreateInfo = vk::RenderPassCreateInfo()
                                                         .setAttachmentCount(1)
                                                         .setPAttachments(&colorAttachment)
                                                         .setSubpassCount(1)
-                                                        .setPSubpasses(&subpass);
+                                                        .setPSubpasses(&subpass)
+                                                        .setDependencyCount(1)
+                                                        .setPDependencies(&subpassDependency);
 
     vk::Result result = logicalDevice.createRenderPass(&renderPassCreateInfo, nullptr, &renderPass);
     if (result != vk::Result::eSuccess)
@@ -934,4 +952,90 @@ void Application::recordCommandBuffer(vk::CommandBuffer commandBuffer, uint32_t 
 
     commandBuffer.endRenderPass();
     commandBuffer.end();
+}
+
+void Application::drawFrame()
+{
+    vk::Result result = logicalDevice.waitForFences(1, &inFlightFence, VK_TRUE, UINT64_MAX);
+    if (result != vk::Result::eSuccess)
+    {
+        throw std::runtime_error("Failed to wait for in-flight fence! Error Code: " + vk::to_string(result));
+    }
+
+    result = logicalDevice.resetFences(1, &inFlightFence);
+    if (result != vk::Result::eSuccess)
+    {
+        throw std::runtime_error("Failed to reset in-flight fence! Error Code: " + vk::to_string(result));
+    }
+
+    uint32_t imageIndex;
+    result = logicalDevice.acquireNextImageKHR(swapChain, UINT64_MAX, imageAvailableSemaphore, VK_NULL_HANDLE, &imageIndex);
+    if (result != vk::Result::eSuccess)
+    {
+        throw std::runtime_error("Failed to acquire next swap chain image! Error Code: " + vk::to_string(result));
+    }
+
+    commandBuffer.reset();
+    recordCommandBuffer(commandBuffer, imageIndex);
+
+    vk::Semaphore waitSemaphores[] = {imageAvailableSemaphore};
+    vk::PipelineStageFlags waitStages[] = {vk::PipelineStageFlagBits::eColorAttachmentOutput};
+
+    vk::Semaphore signalSemaphores[] = {renderFinishedSemaphore};
+
+    vk::SubmitInfo submitInfo = vk::SubmitInfo()
+                                    .setWaitSemaphoreCount(1)
+                                    .setPWaitSemaphores(waitSemaphores)
+                                    .setPWaitDstStageMask(waitStages)
+                                    .setCommandBufferCount(1)
+                                    .setPCommandBuffers(&commandBuffer)
+                                    .setSignalSemaphoreCount(1)
+                                    .setPSignalSemaphores(signalSemaphores);
+
+    result = graphicsQueue.submit(1, &submitInfo, inFlightFence);
+    if (result != vk::Result::eSuccess)
+    {
+        throw std::runtime_error("Failed to submit draw command buffer! Error Code: " + vk::to_string(result));
+    }
+
+    vk::SwapchainKHR swapChains[] = {swapChain};
+
+    vk::PresentInfoKHR presentInfo = vk::PresentInfoKHR()
+                                         .setWaitSemaphoreCount(1)
+                                         .setPWaitSemaphores(signalSemaphores)
+                                         .setSwapchainCount(1)
+                                         .setPSwapchains(swapChains)
+                                         .setPImageIndices(&imageIndex)
+                                         .setPResults(nullptr);
+
+    result = presentQueue.presentKHR(&presentInfo);
+    if (result != vk::Result::eSuccess)
+    {
+        throw std::runtime_error("Failed to present: present queue! Error Code: " + vk::to_string(result));
+    }
+}
+
+void Application::createSyncObjects()
+{
+    vk::SemaphoreCreateInfo semaphoreCreateInfo = vk::SemaphoreCreateInfo();
+    vk::FenceCreateInfo fenceCreateInfo = vk::FenceCreateInfo()
+                                              .setFlags(vk::FenceCreateFlagBits::eSignaled);
+
+    vk::Result result = logicalDevice.createSemaphore(&semaphoreCreateInfo, nullptr, &imageAvailableSemaphore);
+    if (result != vk::Result::eSuccess)
+    {
+        throw std::runtime_error("Failed to create image available semaphore! Error Code: " + vk::to_string(result));
+    }
+
+    result = logicalDevice.createSemaphore(&semaphoreCreateInfo, nullptr, &renderFinishedSemaphore);
+    if (result != vk::Result::eSuccess)
+    {
+        throw std::runtime_error("Failed to create render finished semaphore! Error Code: " + vk::to_string(result));
+    }
+
+    result = logicalDevice.createFence(&fenceCreateInfo, nullptr, &inFlightFence);
+    if (result != vk::Result::eSuccess)
+    {
+        throw std::runtime_error("Failed to create in-flight fence! Error Code: " + vk::to_string(result));
+    }
 }

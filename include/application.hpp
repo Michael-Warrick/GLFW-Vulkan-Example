@@ -89,6 +89,10 @@ private:
     void createCommandBuffer();
     void recordCommandBuffer(vk::CommandBuffer commandBuffer, uint32_t imageIndex);
 
+    void drawFrame();
+
+    void createSyncObjects();
+
     GLFWwindow *window = nullptr;
 
     vk::Instance instance;
@@ -152,4 +156,8 @@ private:
 
     vk::CommandPool commandPool;
     vk::CommandBuffer commandBuffer;
+
+    vk::Semaphore imageAvailableSemaphore;
+    vk::Semaphore renderFinishedSemaphore;
+    vk::Fence inFlightFence;
 };
