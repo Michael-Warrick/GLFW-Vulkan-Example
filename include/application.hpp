@@ -93,6 +93,11 @@ private:
 
     void createSyncObjects();
 
+    void recreateSwapChain();
+    void cleanupSwapChain();
+
+    static void framebufferResizeCallback(GLFWwindow *window, int width, int height);
+
     const int MAX_FRAMES_IN_FLIGHT = 2;
     GLFWwindow *window = nullptr;
 
@@ -163,4 +168,6 @@ private:
     std::vector<vk::Fence> inFlightFences;
 
     uint32_t currentFrame = 0;
+
+    bool framebufferResized = false;
 };

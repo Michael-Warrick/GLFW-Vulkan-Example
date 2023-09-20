@@ -19,6 +19,8 @@ void Application::initWindow()
 
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     window = glfwCreateWindow(800, 600, "GLFW Vulkan Example", nullptr, nullptr);
+    glfwSetWindowUserPointer(window, this);
+    glfwSetFramebufferSizeCallback(window, framebufferResizeCallback);
 }
 
 void Application::initVulkan()
@@ -51,6 +53,13 @@ void Application::update()
 
 void Application::shutdown()
 {
+    cleanupSwapChain();
+
+    logicalDevice.destroyPipeline(graphicsPipeline);
+    logicalDevice.destroyPipelineLayout(pipelineLayout);
+
+    logicalDevice.destroyRenderPass(renderPass);
+
     for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
     {
         logicalDevice.destroySemaphore(imageAvailableSemaphores[i]);
@@ -60,21 +69,6 @@ void Application::shutdown()
 
     logicalDevice.destroyCommandPool(commandPool);
 
-    for (auto framebuffer : swapChainFrameBuffers)
-    {
-        logicalDevice.destroyFramebuffer(framebuffer);
-    }
-
-    logicalDevice.destroyPipeline(graphicsPipeline);
-    logicalDevice.destroyPipelineLayout(pipelineLayout);
-    logicalDevice.destroyRenderPass(renderPass);
-
-    for (auto imageView : swapChainImageViews)
-    {
-        logicalDevice.destroyImageView(imageView);
-    }
-
-    logicalDevice.destroySwapchainKHR(swapChain);
     logicalDevice.destroy();
 
     if (enableValidationLayers)
@@ -83,7 +77,6 @@ void Application::shutdown()
     }
 
     instance.destroySurfaceKHR(surface);
-
     instance.destroy();
 
     glfwDestroyWindow(window);
@@ -966,18 +959,23 @@ void Application::drawFrame()
     {
         throw std::runtime_error("Failed to wait for in-flight fence! Error Code: " + vk::to_string(result));
     }
-
+    
+    uint32_t imageIndex;
+    result = logicalDevice.acquireNextImageKHR(swapChain, UINT64_MAX, imageAvailableSemaphores[currentFrame], VK_NULL_HANDLE, &imageIndex);
+    if (result == vk::Result::eErrorOutOfDateKHR)
+    {
+        recreateSwapChain();
+        return;
+    }
+    else if (result != vk::Result::eSuccess && result != vk::Result::eSuboptimalKHR)
+    {
+        throw std::runtime_error("failed to acquire swap chain image!");
+    }
+    
     result = logicalDevice.resetFences(1, &inFlightFences[currentFrame]);
     if (result != vk::Result::eSuccess)
     {
         throw std::runtime_error("Failed to reset in-flight fence! Error Code: " + vk::to_string(result));
-    }
-
-    uint32_t imageIndex;
-    result = logicalDevice.acquireNextImageKHR(swapChain, UINT64_MAX, imageAvailableSemaphores[currentFrame], VK_NULL_HANDLE, &imageIndex);
-    if (result != vk::Result::eSuccess)
-    {
-        throw std::runtime_error("Failed to acquire next swap chain image! Error Code: " + vk::to_string(result));
     }
 
     commandBuffers[currentFrame].reset();
@@ -1014,7 +1012,12 @@ void Application::drawFrame()
                                          .setPResults(nullptr);
 
     result = presentQueue.presentKHR(&presentInfo);
-    if (result != vk::Result::eSuccess)
+    if (result == vk::Result::eErrorOutOfDateKHR || result == vk::Result::eSuboptimalKHR || framebufferResized)
+    {
+        framebufferResized = false;
+        recreateSwapChain();
+    }
+    else if (result != vk::Result::eSuccess)
     {
         throw std::runtime_error("Failed to present: present queue! Error Code: " + vk::to_string(result));
     }
@@ -1052,4 +1055,46 @@ void Application::createSyncObjects()
             throw std::runtime_error("Failed to create in-flight fence! Error Code: " + vk::to_string(result));
         }
     }
+}
+
+void Application::recreateSwapChain()
+{
+    int width = 0;
+    int height = 0;
+    glfwGetFramebufferSize(window, &width, &height);
+
+    while (width == 0 || height == 0)
+    {
+        glfwGetFramebufferSize(window, &width, &height);
+        glfwWaitEvents();
+    }
+
+    logicalDevice.waitIdle();
+
+    cleanupSwapChain();
+
+    createSwapChain();
+    createImageViews();
+    createFramebuffers();
+}
+
+void Application::cleanupSwapChain()
+{
+    for (size_t i = 0; i < swapChainFrameBuffers.size(); i++)
+    {
+        logicalDevice.destroyFramebuffer(swapChainFrameBuffers[i]);
+    }
+
+    for (size_t i = 0; i < swapChainImageViews.size(); i++)
+    {
+        logicalDevice.destroyImageView(swapChainImageViews[i]);
+    }
+
+    logicalDevice.destroySwapchainKHR(swapChain);
+}
+
+void Application::framebufferResizeCallback(GLFWwindow *window, int width, int height) 
+{
+    auto app = reinterpret_cast<Application*>(glfwGetWindowUserPointer(window));
+    app->framebufferResized = true;
 }
