@@ -34,7 +34,7 @@ void Application::initVulkan()
     createGraphicsPipeline();
     createFramebuffers();
     createCommandPool();
-    createCommandBuffer();
+    createCommandBuffers();
     createSyncObjects();
 }
 
@@ -51,9 +51,12 @@ void Application::update()
 
 void Application::shutdown()
 {
-    logicalDevice.destroySemaphore(imageAvailableSemaphore);
-    logicalDevice.destroySemaphore(renderFinishedSemaphore);
-    logicalDevice.destroyFence(inFlightFence);
+    for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
+    {
+        logicalDevice.destroySemaphore(imageAvailableSemaphores[i]);
+        logicalDevice.destroySemaphore(renderFinishedSemaphores[i]);
+        logicalDevice.destroyFence(inFlightFences[i]);
+    }
 
     logicalDevice.destroyCommandPool(commandPool);
 
@@ -899,14 +902,16 @@ void Application::createCommandPool()
     }
 }
 
-void Application::createCommandBuffer()
+void Application::createCommandBuffers()
 {
+    commandBuffers.resize(MAX_FRAMES_IN_FLIGHT);
+
     vk::CommandBufferAllocateInfo allocateCreateInfo = vk::CommandBufferAllocateInfo()
                                                            .setCommandPool(commandPool)
                                                            .setLevel(vk::CommandBufferLevel::ePrimary)
-                                                           .setCommandBufferCount(1);
+                                                           .setCommandBufferCount((uint32_t)commandBuffers.size());
 
-    vk::Result result = logicalDevice.allocateCommandBuffers(&allocateCreateInfo, &commandBuffer);
+    vk::Result result = logicalDevice.allocateCommandBuffers(&allocateCreateInfo, commandBuffers.data());
     if (result != vk::Result::eSuccess)
     {
         throw std::runtime_error("Failed to allocate command buffers! Error Code: " + vk::to_string(result));
@@ -956,43 +961,43 @@ void Application::recordCommandBuffer(vk::CommandBuffer commandBuffer, uint32_t 
 
 void Application::drawFrame()
 {
-    vk::Result result = logicalDevice.waitForFences(1, &inFlightFence, VK_TRUE, UINT64_MAX);
+    vk::Result result = logicalDevice.waitForFences(1, &inFlightFences[currentFrame], VK_TRUE, UINT64_MAX);
     if (result != vk::Result::eSuccess)
     {
         throw std::runtime_error("Failed to wait for in-flight fence! Error Code: " + vk::to_string(result));
     }
 
-    result = logicalDevice.resetFences(1, &inFlightFence);
+    result = logicalDevice.resetFences(1, &inFlightFences[currentFrame]);
     if (result != vk::Result::eSuccess)
     {
         throw std::runtime_error("Failed to reset in-flight fence! Error Code: " + vk::to_string(result));
     }
 
     uint32_t imageIndex;
-    result = logicalDevice.acquireNextImageKHR(swapChain, UINT64_MAX, imageAvailableSemaphore, VK_NULL_HANDLE, &imageIndex);
+    result = logicalDevice.acquireNextImageKHR(swapChain, UINT64_MAX, imageAvailableSemaphores[currentFrame], VK_NULL_HANDLE, &imageIndex);
     if (result != vk::Result::eSuccess)
     {
         throw std::runtime_error("Failed to acquire next swap chain image! Error Code: " + vk::to_string(result));
     }
 
-    commandBuffer.reset();
-    recordCommandBuffer(commandBuffer, imageIndex);
+    commandBuffers[currentFrame].reset();
+    recordCommandBuffer(commandBuffers[currentFrame], imageIndex);
 
-    vk::Semaphore waitSemaphores[] = {imageAvailableSemaphore};
+    vk::Semaphore waitSemaphores[] = {imageAvailableSemaphores[currentFrame]};
     vk::PipelineStageFlags waitStages[] = {vk::PipelineStageFlagBits::eColorAttachmentOutput};
 
-    vk::Semaphore signalSemaphores[] = {renderFinishedSemaphore};
+    vk::Semaphore signalSemaphores[] = {renderFinishedSemaphores[currentFrame]};
 
     vk::SubmitInfo submitInfo = vk::SubmitInfo()
                                     .setWaitSemaphoreCount(1)
                                     .setPWaitSemaphores(waitSemaphores)
                                     .setPWaitDstStageMask(waitStages)
                                     .setCommandBufferCount(1)
-                                    .setPCommandBuffers(&commandBuffer)
+                                    .setPCommandBuffers(&commandBuffers[currentFrame])
                                     .setSignalSemaphoreCount(1)
                                     .setPSignalSemaphores(signalSemaphores);
 
-    result = graphicsQueue.submit(1, &submitInfo, inFlightFence);
+    result = graphicsQueue.submit(1, &submitInfo, inFlightFences[currentFrame]);
     if (result != vk::Result::eSuccess)
     {
         throw std::runtime_error("Failed to submit draw command buffer! Error Code: " + vk::to_string(result));
@@ -1013,29 +1018,38 @@ void Application::drawFrame()
     {
         throw std::runtime_error("Failed to present: present queue! Error Code: " + vk::to_string(result));
     }
+
+    currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
 }
 
 void Application::createSyncObjects()
 {
+    imageAvailableSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
+    renderFinishedSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
+    inFlightFences.resize(MAX_FRAMES_IN_FLIGHT);
+
     vk::SemaphoreCreateInfo semaphoreCreateInfo = vk::SemaphoreCreateInfo();
     vk::FenceCreateInfo fenceCreateInfo = vk::FenceCreateInfo()
                                               .setFlags(vk::FenceCreateFlagBits::eSignaled);
 
-    vk::Result result = logicalDevice.createSemaphore(&semaphoreCreateInfo, nullptr, &imageAvailableSemaphore);
-    if (result != vk::Result::eSuccess)
+    for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
     {
-        throw std::runtime_error("Failed to create image available semaphore! Error Code: " + vk::to_string(result));
-    }
+        vk::Result result = logicalDevice.createSemaphore(&semaphoreCreateInfo, nullptr, &imageAvailableSemaphores[i]);
+        if (result != vk::Result::eSuccess)
+        {
+            throw std::runtime_error("Failed to create image available semaphore! Error Code: " + vk::to_string(result));
+        }
 
-    result = logicalDevice.createSemaphore(&semaphoreCreateInfo, nullptr, &renderFinishedSemaphore);
-    if (result != vk::Result::eSuccess)
-    {
-        throw std::runtime_error("Failed to create render finished semaphore! Error Code: " + vk::to_string(result));
-    }
+        result = logicalDevice.createSemaphore(&semaphoreCreateInfo, nullptr, &renderFinishedSemaphores[i]);
+        if (result != vk::Result::eSuccess)
+        {
+            throw std::runtime_error("Failed to create render finished semaphore! Error Code: " + vk::to_string(result));
+        }
 
-    result = logicalDevice.createFence(&fenceCreateInfo, nullptr, &inFlightFence);
-    if (result != vk::Result::eSuccess)
-    {
-        throw std::runtime_error("Failed to create in-flight fence! Error Code: " + vk::to_string(result));
+        result = logicalDevice.createFence(&fenceCreateInfo, nullptr, &inFlightFences[i]);
+        if (result != vk::Result::eSuccess)
+        {
+            throw std::runtime_error("Failed to create in-flight fence! Error Code: " + vk::to_string(result));
+        }
     }
 }

@@ -86,13 +86,14 @@ private:
     void createRenderPass();
     void createFramebuffers();
     void createCommandPool();
-    void createCommandBuffer();
+    void createCommandBuffers();
     void recordCommandBuffer(vk::CommandBuffer commandBuffer, uint32_t imageIndex);
 
     void drawFrame();
 
     void createSyncObjects();
 
+    const int MAX_FRAMES_IN_FLIGHT = 2;
     GLFWwindow *window = nullptr;
 
     vk::Instance instance;
@@ -155,9 +156,11 @@ private:
     std::vector<vk::Framebuffer> swapChainFrameBuffers;
 
     vk::CommandPool commandPool;
-    vk::CommandBuffer commandBuffer;
+    std::vector<vk::CommandBuffer> commandBuffers;
 
-    vk::Semaphore imageAvailableSemaphore;
-    vk::Semaphore renderFinishedSemaphore;
-    vk::Fence inFlightFence;
+    std::vector<vk::Semaphore> imageAvailableSemaphores;
+    std::vector<vk::Semaphore> renderFinishedSemaphores;
+    std::vector<vk::Fence> inFlightFences;
+
+    uint32_t currentFrame = 0;
 };
