@@ -36,6 +36,7 @@ void Application::initVulkan()
     createGraphicsPipeline();
     createFramebuffers();
     createCommandPool();
+    createVertexBuffer();
     createCommandBuffers();
     createSyncObjects();
 }
@@ -54,6 +55,9 @@ void Application::update()
 void Application::shutdown()
 {
     cleanupSwapChain();
+
+    logicalDevice.destroyBuffer(vertexBuffer);
+    logicalDevice.freeMemory(vertexBufferMemory);
 
     logicalDevice.destroyPipeline(graphicsPipeline);
     logicalDevice.destroyPipelineLayout(pipelineLayout);
@@ -680,11 +684,14 @@ void Application::createGraphicsPipeline()
                                                                           .setPName("main");
     vk::PipelineShaderStageCreateInfo shaderStages[] = {vertexShaderStageCreateInfo, fragmentShaderStageCreateInfo};
 
+    auto bindingDescription = Vertex::getBindingDescription();
+    auto attributeDescriptions = Vertex::getAttributeDescriptions();
+
     vk::PipelineVertexInputStateCreateInfo vertexInputCreateInfo = vk::PipelineVertexInputStateCreateInfo()
-                                                                       .setVertexBindingDescriptionCount(0)
-                                                                       .setPVertexBindingDescriptions(nullptr)
-                                                                       .setVertexAttributeDescriptionCount(0)
-                                                                       .setPVertexAttributeDescriptions(nullptr);
+                                                                       .setVertexBindingDescriptionCount(1)
+                                                                       .setPVertexBindingDescriptions(&bindingDescription)
+                                                                       .setVertexAttributeDescriptionCount(static_cast<uint32_t>(attributeDescriptions.size()))
+                                                                       .setPVertexAttributeDescriptions(attributeDescriptions.data());
 
     vk::PipelineInputAssemblyStateCreateInfo inputAssemblyCreateInfo = vk::PipelineInputAssemblyStateCreateInfo()
                                                                            .setTopology(vk::PrimitiveTopology::eTriangleList)
@@ -946,7 +953,11 @@ void Application::recordCommandBuffer(vk::CommandBuffer commandBuffer, uint32_t 
                              .setExtent(swapChainExtent);
     commandBuffer.setScissor(0, 1, &scissor);
 
-    commandBuffer.draw(3, 1, 0, 0);
+    vk::Buffer vertexBuffers[] = {vertexBuffer};
+    vk::DeviceSize offsets[] = {0};
+    commandBuffer.bindVertexBuffers(0, 1, vertexBuffers, offsets);
+
+    commandBuffer.draw(static_cast<uint32_t>(vertices.size()), 1, 0, 0);
 
     commandBuffer.endRenderPass();
     commandBuffer.end();
@@ -959,7 +970,7 @@ void Application::drawFrame()
     {
         throw std::runtime_error("Failed to wait for in-flight fence! Error Code: " + vk::to_string(result));
     }
-    
+
     uint32_t imageIndex;
     result = logicalDevice.acquireNextImageKHR(swapChain, UINT64_MAX, imageAvailableSemaphores[currentFrame], VK_NULL_HANDLE, &imageIndex);
     if (result == vk::Result::eErrorOutOfDateKHR)
@@ -971,7 +982,7 @@ void Application::drawFrame()
     {
         throw std::runtime_error("failed to acquire swap chain image!");
     }
-    
+
     result = logicalDevice.resetFences(1, &inFlightFences[currentFrame]);
     if (result != vk::Result::eSuccess)
     {
@@ -1093,8 +1104,58 @@ void Application::cleanupSwapChain()
     logicalDevice.destroySwapchainKHR(swapChain);
 }
 
-void Application::framebufferResizeCallback(GLFWwindow *window, int width, int height) 
+void Application::framebufferResizeCallback(GLFWwindow *window, int width, int height)
 {
-    auto app = reinterpret_cast<Application*>(glfwGetWindowUserPointer(window));
+    auto app = reinterpret_cast<Application *>(glfwGetWindowUserPointer(window));
     app->framebufferResized = true;
+}
+
+void Application::createVertexBuffer()
+{
+    vk::BufferCreateInfo vertexBufferCreateInfo = vk::BufferCreateInfo()
+                                                      .setSize(sizeof(vertices[0]) * vertices.size())
+                                                      .setUsage(vk::BufferUsageFlagBits::eVertexBuffer)
+                                                      .setSharingMode(vk::SharingMode::eExclusive);
+
+    vk::Result result = logicalDevice.createBuffer(&vertexBufferCreateInfo, nullptr, &vertexBuffer);
+    if (result != vk::Result::eSuccess)
+    {
+        throw std::runtime_error("Failed to create vertex buffer! Error Code: " + vk::to_string(result));
+    }
+
+    vk::MemoryRequirements memoryRequirements;
+    logicalDevice.getBufferMemoryRequirements(vertexBuffer, &memoryRequirements);
+
+    vk::MemoryAllocateInfo memoryAllocateInfo = vk::MemoryAllocateInfo()
+                                                    .setAllocationSize(memoryRequirements.size)
+                                                    .setMemoryTypeIndex(findMemoryType(memoryRequirements.memoryTypeBits, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent));
+
+    result = logicalDevice.allocateMemory(&memoryAllocateInfo, nullptr, &vertexBufferMemory);
+    if (result != vk::Result::eSuccess)
+    {
+        throw std::runtime_error("Failed to allocate vertex buffer memory! Error Code: " + vk::to_string(result));
+    }
+
+    logicalDevice.bindBufferMemory(vertexBuffer, vertexBufferMemory, 0);
+
+    void* data;
+    logicalDevice.mapMemory(vertexBufferMemory, 0, vertexBufferCreateInfo.size, vk::MemoryMapFlags(), &data);
+    memcpy(data, vertices.data(), (size_t)vertexBufferCreateInfo.size);
+    logicalDevice.unmapMemory(vertexBufferMemory);
+}
+
+uint32_t Application::findMemoryType(uint32_t typeFilter, vk::MemoryPropertyFlags properties)
+{
+    vk::PhysicalDeviceMemoryProperties physicalDeviceMemoryProperties;
+    physicalDevice.getMemoryProperties(&physicalDeviceMemoryProperties);
+
+    for (uint32_t i = 0; i < physicalDeviceMemoryProperties.memoryTypeCount; i++)
+    {
+        if ((typeFilter & (1 << i)) && (physicalDeviceMemoryProperties.memoryTypes[i].propertyFlags & properties) == properties)
+        {
+            return i;
+        }
+    }
+
+    throw std::runtime_error("Failed to find suitable memory type!");
 }
