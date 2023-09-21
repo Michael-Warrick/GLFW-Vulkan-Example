@@ -1139,7 +1139,12 @@ void Application::createVertexBuffer()
     logicalDevice.bindBufferMemory(vertexBuffer, vertexBufferMemory, 0);
 
     void* data;
-    logicalDevice.mapMemory(vertexBufferMemory, 0, vertexBufferCreateInfo.size, vk::MemoryMapFlags(), &data);
+    result = logicalDevice.mapMemory(vertexBufferMemory, 0, vertexBufferCreateInfo.size, vk::MemoryMapFlags(), &data);
+    if (result != vk::Result::eSuccess)
+    {
+        throw std::runtime_error("Failed to map vertex buffer memory! Error Code: " + vk::to_string(result));
+    }
+    
     memcpy(data, vertices.data(), (size_t)vertexBufferCreateInfo.size);
     logicalDevice.unmapMemory(vertexBufferMemory);
 }
