@@ -137,6 +137,7 @@ private:
     static void framebufferResizeCallback(GLFWwindow *window, int width, int height);
 
     void createVertexBuffer();
+    void createIndexBuffer();
     uint32_t findMemoryType(uint32_t typeFilter, vk::MemoryPropertyFlags properties);
 
     void createBuffer(vk::DeviceSize size, vk::BufferUsageFlags usage, vk::MemoryPropertyFlags properties, vk::Buffer &buffer, vk::DeviceMemory &bufferMemory);
@@ -217,10 +218,17 @@ private:
 
     const std::vector<Vertex> vertices = {
         // Position (x, y) and Color (RGB)
-        {{0.0f, -0.5f}, {1.0f, 0.0f, 0.0f}},
-        {{0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}},
-        {{-0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}}};
+        {{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}},
+        {{0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}},
+        {{0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}},
+        {{-0.5f, 0.5f}, {1.0f, 1.0f, 1.0f}}};
+
+    const std::vector<uint16_t> indices = {
+        0, 1, 2, 2, 3, 0
+    };
     
     vk::Buffer vertexBuffer;
     vk::DeviceMemory vertexBufferMemory;
+    vk::Buffer indexBuffer;
+    vk::DeviceMemory indexBufferMemory;
 };

@@ -37,6 +37,7 @@ void Application::initVulkan()
     createFramebuffers();
     createCommandPool();
     createVertexBuffer();
+    createIndexBuffer();
     createCommandBuffers();
     createSyncObjects();
 }
@@ -55,6 +56,9 @@ void Application::update()
 void Application::shutdown()
 {
     cleanupSwapChain();
+
+    logicalDevice.destroyBuffer(indexBuffer);
+    logicalDevice.freeMemory(indexBufferMemory);
 
     logicalDevice.destroyBuffer(vertexBuffer);
     logicalDevice.freeMemory(vertexBufferMemory);
@@ -956,8 +960,9 @@ void Application::recordCommandBuffer(vk::CommandBuffer commandBuffer, uint32_t 
     vk::Buffer vertexBuffers[] = {vertexBuffer};
     vk::DeviceSize offsets[] = {0};
     commandBuffer.bindVertexBuffers(0, 1, vertexBuffers, offsets);
+    commandBuffer.bindIndexBuffer(indexBuffer, 0, vk::IndexType::eUint16);
 
-    commandBuffer.draw(static_cast<uint32_t>(vertices.size()), 1, 0, 0);
+    commandBuffer.drawIndexed(static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);
 
     commandBuffer.endRenderPass();
     commandBuffer.end();
@@ -1130,6 +1135,31 @@ void Application::createVertexBuffer()
 
     createBuffer(bufferSize, vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eVertexBuffer, vk::MemoryPropertyFlagBits::eDeviceLocal, vertexBuffer, vertexBufferMemory);
     copyBuffer(stagingBuffer, vertexBuffer, bufferSize);
+
+    logicalDevice.destroyBuffer(stagingBuffer);
+    logicalDevice.freeMemory(stagingBufferMemory);
+}
+
+void Application::createIndexBuffer()
+{
+    vk::DeviceSize bufferSize = sizeof(indices[0]) * indices.size();
+
+    vk::Buffer stagingBuffer;
+    vk::DeviceMemory stagingBufferMemory;
+    createBuffer(bufferSize, vk::BufferUsageFlagBits::eTransferSrc, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent, stagingBuffer, stagingBufferMemory);
+
+    void* data;
+    vk::Result result = logicalDevice.mapMemory(stagingBufferMemory, 0, bufferSize, vk::MemoryMapFlags(), &data);
+    if (result != vk::Result::eSuccess)
+    {
+        throw std::runtime_error("Failed to map vertex buffer memory! Error Code: " + vk::to_string(result));
+    }
+
+    memcpy(data, indices.data(), (size_t)bufferSize);
+    logicalDevice.unmapMemory(stagingBufferMemory);
+
+    createBuffer(bufferSize, vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eIndexBuffer, vk::MemoryPropertyFlagBits::eDeviceLocal, indexBuffer, indexBufferMemory);
+    copyBuffer(stagingBuffer, indexBuffer, bufferSize);
 
     logicalDevice.destroyBuffer(stagingBuffer);
     logicalDevice.freeMemory(stagingBufferMemory);
