@@ -190,7 +190,7 @@ std::vector<const char *> Application::getRequiredInstanceExtensions()
     {
         requiredExtensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
 
-        std::cout << "Required extensions (" << requiredExtensions.size() << "):\n";
+        std::cout << "Required instance extensions (" << requiredExtensions.size() << "):\n";
 
         for (const auto &extension : requiredExtensions)
         {
@@ -221,7 +221,7 @@ std::vector<vk::ExtensionProperties> Application::getAvailableInstanceExtensions
     if (enableValidationLayers)
     {
         // Print all available extensions and their names
-        std::cout << "Available extensions (" << extensionCount << "):\n";
+        std::cout << "Available instance extensions (" << extensionCount << "):\n";
 
         for (const auto &extension : availableExtensions)
         {
@@ -1112,41 +1112,27 @@ void Application::framebufferResizeCallback(GLFWwindow *window, int width, int h
 
 void Application::createVertexBuffer()
 {
-    vk::BufferCreateInfo vertexBufferCreateInfo = vk::BufferCreateInfo()
-                                                      .setSize(sizeof(vertices[0]) * vertices.size())
-                                                      .setUsage(vk::BufferUsageFlagBits::eVertexBuffer)
-                                                      .setSharingMode(vk::SharingMode::eExclusive);
+    vk::DeviceSize bufferSize = sizeof(vertices[0]) * vertices.size();
 
-    vk::Result result = logicalDevice.createBuffer(&vertexBufferCreateInfo, nullptr, &vertexBuffer);
-    if (result != vk::Result::eSuccess)
-    {
-        throw std::runtime_error("Failed to create vertex buffer! Error Code: " + vk::to_string(result));
-    }
+    vk::Buffer stagingBuffer;
+    vk::DeviceMemory stagingBufferMemory;
+    createBuffer(bufferSize, vk::BufferUsageFlagBits::eTransferSrc, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent, stagingBuffer, stagingBufferMemory);
 
-    vk::MemoryRequirements memoryRequirements;
-    logicalDevice.getBufferMemoryRequirements(vertexBuffer, &memoryRequirements);
-
-    vk::MemoryAllocateInfo memoryAllocateInfo = vk::MemoryAllocateInfo()
-                                                    .setAllocationSize(memoryRequirements.size)
-                                                    .setMemoryTypeIndex(findMemoryType(memoryRequirements.memoryTypeBits, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent));
-
-    result = logicalDevice.allocateMemory(&memoryAllocateInfo, nullptr, &vertexBufferMemory);
-    if (result != vk::Result::eSuccess)
-    {
-        throw std::runtime_error("Failed to allocate vertex buffer memory! Error Code: " + vk::to_string(result));
-    }
-
-    logicalDevice.bindBufferMemory(vertexBuffer, vertexBufferMemory, 0);
-
-    void* data;
-    result = logicalDevice.mapMemory(vertexBufferMemory, 0, vertexBufferCreateInfo.size, vk::MemoryMapFlags(), &data);
+    void *data;
+    vk::Result result = logicalDevice.mapMemory(stagingBufferMemory, 0, bufferSize, vk::MemoryMapFlags(), &data);
     if (result != vk::Result::eSuccess)
     {
         throw std::runtime_error("Failed to map vertex buffer memory! Error Code: " + vk::to_string(result));
     }
-    
-    memcpy(data, vertices.data(), (size_t)vertexBufferCreateInfo.size);
-    logicalDevice.unmapMemory(vertexBufferMemory);
+
+    memcpy(data, vertices.data(), (size_t)bufferSize);
+    logicalDevice.unmapMemory(stagingBufferMemory);
+
+    createBuffer(bufferSize, vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eVertexBuffer, vk::MemoryPropertyFlagBits::eDeviceLocal, vertexBuffer, vertexBufferMemory);
+    copyBuffer(stagingBuffer, vertexBuffer, bufferSize);
+
+    logicalDevice.destroyBuffer(stagingBuffer);
+    logicalDevice.freeMemory(stagingBufferMemory);
 }
 
 uint32_t Application::findMemoryType(uint32_t typeFilter, vk::MemoryPropertyFlags properties)
@@ -1163,4 +1149,78 @@ uint32_t Application::findMemoryType(uint32_t typeFilter, vk::MemoryPropertyFlag
     }
 
     throw std::runtime_error("Failed to find suitable memory type!");
+}
+
+void Application::createBuffer(vk::DeviceSize size, vk::BufferUsageFlags usage, vk::MemoryPropertyFlags properties, vk::Buffer &buffer, vk::DeviceMemory &bufferMemory)
+{
+    vk::BufferCreateInfo bufferCreateInfo = vk::BufferCreateInfo()
+                                                .setSize(size)
+                                                .setUsage(usage)
+                                                .setSharingMode(vk::SharingMode::eExclusive);
+
+    vk::Result result = logicalDevice.createBuffer(&bufferCreateInfo, nullptr, &buffer);
+    if (result != vk::Result::eSuccess)
+    {
+        throw std::runtime_error("Failed to create buffer! Error Code: " + vk::to_string(result));
+    }
+
+    vk::MemoryRequirements memoryRequirements;
+    logicalDevice.getBufferMemoryRequirements(buffer, &memoryRequirements);
+
+    vk::MemoryAllocateInfo memoryAllocateInfo = vk::MemoryAllocateInfo()
+                                                    .setAllocationSize(memoryRequirements.size)
+                                                    .setMemoryTypeIndex(findMemoryType(memoryRequirements.memoryTypeBits, properties));
+
+    result = logicalDevice.allocateMemory(&memoryAllocateInfo, nullptr, &bufferMemory);
+    if (result != vk::Result::eSuccess)
+    {
+        throw std::runtime_error("Failed to allocate buffer memory! Error Code: " + vk::to_string(result));
+    }
+
+    logicalDevice.bindBufferMemory(buffer, bufferMemory, 0);
+}
+
+void Application::copyBuffer(vk::Buffer srcBuffer, vk::Buffer dstBuffer, vk::DeviceSize size)
+{
+    vk::CommandBufferAllocateInfo allocateInfo = vk::CommandBufferAllocateInfo()
+                                                     .setLevel(vk::CommandBufferLevel::ePrimary)
+                                                     .setCommandPool(commandPool)
+                                                     .setCommandBufferCount(1);
+
+    vk::CommandBuffer commandBuffer;
+    vk::Result result = logicalDevice.allocateCommandBuffers(&allocateInfo, &commandBuffer);
+    if (result != vk::Result::eSuccess)
+    {
+        throw std::runtime_error("Failed to allocate command buffer! Error Code: " + vk::to_string(result));
+    }
+
+    vk::CommandBufferBeginInfo commandBufferBeginInfo = vk::CommandBufferBeginInfo()
+                                                            .setFlags(vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
+
+    result = commandBuffer.begin(&commandBufferBeginInfo);
+    if (result != vk::Result::eSuccess)
+    {
+        throw std::runtime_error("Failed to begin command buffer! Error Code: " + vk::to_string(result));
+    }
+
+    vk::BufferCopy copyRegion = vk::BufferCopy()
+                                    .setSrcOffset(0)
+                                    .setDstOffset(0)
+                                    .setSize(size);
+    commandBuffer.copyBuffer(srcBuffer, dstBuffer, 1, &copyRegion);
+    commandBuffer.end();
+
+    vk::SubmitInfo submitInfo = vk::SubmitInfo()
+                                    .setCommandBufferCount(1)
+                                    .setPCommandBuffers(&commandBuffer);
+
+    result = graphicsQueue.submit(1, &submitInfo, VK_NULL_HANDLE);
+    if (result != vk::Result::eSuccess)
+    {
+        throw std::runtime_error("Failed to submit command buffer! Error Code: " + vk::to_string(result));
+    }
+
+    graphicsQueue.waitIdle();
+
+    logicalDevice.freeCommandBuffers(commandPool, 1, &commandBuffer);
 }
