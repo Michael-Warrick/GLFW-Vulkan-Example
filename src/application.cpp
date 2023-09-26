@@ -33,11 +33,13 @@ void Application::initVulkan()
     createSwapChain();
     createImageViews();
     createRenderPass();
+    createDescriptorSetLayout();
     createGraphicsPipeline();
     createFramebuffers();
     createCommandPool();
     createVertexBuffer();
     createIndexBuffer();
+    createUniformBuffers();
     createCommandBuffers();
     createSyncObjects();
 }
@@ -56,6 +58,14 @@ void Application::update()
 void Application::shutdown()
 {
     cleanupSwapChain();
+
+    for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
+    {
+        logicalDevice.destroyBuffer(uniformBuffers[i]);
+        logicalDevice.freeMemory(uniformBuffersMemory[i]);
+    }
+    
+    logicalDevice.destroyDescriptorSetLayout(descriptorSetLayout);
 
     logicalDevice.destroyBuffer(indexBuffer);
     logicalDevice.freeMemory(indexBufferMemory);
@@ -751,8 +761,8 @@ void Application::createGraphicsPipeline()
                                                                     .setPDynamicStates(dynamicStates.data());
 
     vk::PipelineLayoutCreateInfo pipelineLayoutCreateInfo = vk::PipelineLayoutCreateInfo()
-                                                                .setSetLayoutCount(0)
-                                                                .setPSetLayouts(nullptr)
+                                                                .setSetLayoutCount(1)
+                                                                .setPSetLayouts(&descriptorSetLayout)
                                                                 .setPushConstantRangeCount(0)
                                                                 .setPPushConstantRanges(nullptr);
 
@@ -988,6 +998,8 @@ void Application::drawFrame()
         throw std::runtime_error("failed to acquire swap chain image!");
     }
 
+    updateUniformBuffer(currentFrame);
+
     result = logicalDevice.resetFences(1, &inFlightFences[currentFrame]);
     if (result != vk::Result::eSuccess)
     {
@@ -1148,7 +1160,7 @@ void Application::createIndexBuffer()
     vk::DeviceMemory stagingBufferMemory;
     createBuffer(bufferSize, vk::BufferUsageFlagBits::eTransferSrc, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent, stagingBuffer, stagingBufferMemory);
 
-    void* data;
+    void *data;
     vk::Result result = logicalDevice.mapMemory(stagingBufferMemory, 0, bufferSize, vk::MemoryMapFlags(), &data);
     if (result != vk::Result::eSuccess)
     {
@@ -1253,4 +1265,61 @@ void Application::copyBuffer(vk::Buffer srcBuffer, vk::Buffer dstBuffer, vk::Dev
     graphicsQueue.waitIdle();
 
     logicalDevice.freeCommandBuffers(commandPool, 1, &commandBuffer);
+}
+
+void Application::createDescriptorSetLayout()
+{
+    vk::DescriptorSetLayoutBinding uboLayoutBinding = vk::DescriptorSetLayoutBinding()
+                                                          .setBinding(0)
+                                                          .setDescriptorType(vk::DescriptorType::eUniformBuffer)
+                                                          .setDescriptorCount(1)
+                                                          .setStageFlags(vk::ShaderStageFlagBits::eVertex)
+                                                          .setPImmutableSamplers(nullptr);
+
+    vk::DescriptorSetLayoutCreateInfo layoutCreateInfo = vk::DescriptorSetLayoutCreateInfo()
+                                                             .setBindingCount(1)
+                                                             .setPBindings(&uboLayoutBinding);
+
+    vk::Result result = logicalDevice.createDescriptorSetLayout(&layoutCreateInfo, nullptr, &descriptorSetLayout);
+    if (result != vk::Result::eSuccess)
+    {
+        throw std::runtime_error("Failed to create descriptor set layout! Error Code: " + vk::to_string(result));
+    }
+}
+
+void Application::createUniformBuffers()
+{
+    vk::DeviceSize bufferSize = sizeof(UniformBufferObject);
+
+    uniformBuffers.resize(MAX_FRAMES_IN_FLIGHT);
+    uniformBuffersMemory.resize(MAX_FRAMES_IN_FLIGHT);
+    uniformBuffersMapped.resize(MAX_FRAMES_IN_FLIGHT);
+
+    vk::Result result;
+
+    for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
+    {
+        createBuffer(bufferSize, vk::BufferUsageFlagBits::eUniformBuffer, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent, uniformBuffers[i], uniformBuffersMemory[i]);
+        result = logicalDevice.mapMemory(uniformBuffersMemory[i], 0, bufferSize, vk::MemoryMapFlags(), &uniformBuffersMapped[i]);
+        if (result != vk::Result::eSuccess)
+        {
+            throw std::runtime_error("Failed to map uniform buffer memory! Error Code: " + vk::to_string(result));
+        }
+    }
+}
+
+void Application::updateUniformBuffer(uint32_t currentImage) 
+{
+    static auto startTime = std::chrono::high_resolution_clock::now();
+    auto currentTime = std::chrono::high_resolution_clock::now();
+
+    float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
+
+    UniformBufferObject ubo;
+    ubo.model = glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+    ubo.view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+    ubo.projection = glm::perspective(glm::radians(45.0f), swapChainExtent.width / (float)swapChainExtent.height, 0.1f, 100.0f);
+    ubo.projection[1][1] *= -1;
+
+    memcpy(uniformBuffersMapped[currentImage], &ubo, sizeof(ubo));
 }

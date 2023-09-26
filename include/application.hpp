@@ -12,8 +12,11 @@
 #include <algorithm>
 #include <fstream>
 #include <array>
+#include <chrono>
 
+#define GLM_FORCE_RADIANS
 #include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 
 class Application
 {
@@ -72,6 +75,13 @@ private:
 
             return attributeDescriptions;
         }
+    };
+
+    struct UniformBufferObject 
+    {
+        glm::mat4 model;
+        glm::mat4 view;
+        glm::mat4 projection;
     };
 
     void init();
@@ -143,6 +153,11 @@ private:
     void createBuffer(vk::DeviceSize size, vk::BufferUsageFlags usage, vk::MemoryPropertyFlags properties, vk::Buffer &buffer, vk::DeviceMemory &bufferMemory);
     void copyBuffer(vk::Buffer srcBuffer, vk::Buffer dstBuffer, vk::DeviceSize size);
 
+    void createDescriptorSetLayout();
+
+    void createUniformBuffers();
+    void updateUniformBuffer(uint32_t currentImages);
+
     const int MAX_FRAMES_IN_FLIGHT = 2;
     GLFWwindow *window = nullptr;
 
@@ -199,6 +214,7 @@ private:
 
     vk::RenderPass renderPass;
 
+    vk::DescriptorSetLayout descriptorSetLayout;
     vk::PipelineLayout pipelineLayout;
 
     vk::Pipeline graphicsPipeline;
@@ -231,4 +247,8 @@ private:
     vk::DeviceMemory vertexBufferMemory;
     vk::Buffer indexBuffer;
     vk::DeviceMemory indexBufferMemory;
+
+    std::vector<vk::Buffer> uniformBuffers;
+    std::vector<vk::DeviceMemory> uniformBuffersMemory;
+    std::vector<void*> uniformBuffersMapped;
 };
