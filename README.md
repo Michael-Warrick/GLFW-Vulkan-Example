@@ -1,5 +1,5 @@
 # GLFW-Vulkan-Example
-![Current state](resources/img/screenshots/Screenshot.png)
+![Current state](resources/img/screenshots/ScreenRecording.gif)
 A minimal example of drawing a Vulkan context inside of a cross-platform GLFW window.
 
 ## Cloning
