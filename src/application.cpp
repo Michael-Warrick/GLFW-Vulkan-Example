@@ -40,6 +40,8 @@ void Application::initVulkan()
     createVertexBuffer();
     createIndexBuffer();
     createUniformBuffers();
+    createDescriptorPool();
+    createDescriptorSets();
     createCommandBuffers();
     createSyncObjects();
 }
@@ -64,7 +66,8 @@ void Application::shutdown()
         logicalDevice.destroyBuffer(uniformBuffers[i]);
         logicalDevice.freeMemory(uniformBuffersMemory[i]);
     }
-    
+
+    logicalDevice.destroyDescriptorPool(descriptorPool);
     logicalDevice.destroyDescriptorSetLayout(descriptorSetLayout);
 
     logicalDevice.destroyBuffer(indexBuffer);
@@ -721,7 +724,7 @@ void Application::createGraphicsPipeline()
                                                                         .setPolygonMode(vk::PolygonMode::eFill)
                                                                         .setLineWidth(1.0f)
                                                                         .setCullMode(vk::CullModeFlagBits::eBack)
-                                                                        .setFrontFace(vk::FrontFace::eClockwise)
+                                                                        .setFrontFace(vk::FrontFace::eCounterClockwise)
                                                                         .setDepthBiasEnable(VK_FALSE)
                                                                         .setDepthBiasConstantFactor(0.0f)
                                                                         .setDepthBiasClamp(0.0f)
@@ -971,6 +974,7 @@ void Application::recordCommandBuffer(vk::CommandBuffer commandBuffer, uint32_t 
     vk::DeviceSize offsets[] = {0};
     commandBuffer.bindVertexBuffers(0, 1, vertexBuffers, offsets);
     commandBuffer.bindIndexBuffer(indexBuffer, 0, vk::IndexType::eUint16);
+    commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipelineLayout, 0, 1, &descriptorSets[currentFrame], 0, nullptr);
 
     commandBuffer.drawIndexed(static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);
 
@@ -1308,7 +1312,7 @@ void Application::createUniformBuffers()
     }
 }
 
-void Application::updateUniformBuffer(uint32_t currentImage) 
+void Application::updateUniformBuffer(uint32_t currentImage)
 {
     static auto startTime = std::chrono::high_resolution_clock::now();
     auto currentTime = std::chrono::high_resolution_clock::now();
@@ -1322,4 +1326,60 @@ void Application::updateUniformBuffer(uint32_t currentImage)
     ubo.projection[1][1] *= -1;
 
     memcpy(uniformBuffersMapped[currentImage], &ubo, sizeof(ubo));
+}
+
+void Application::createDescriptorPool()
+{
+    vk::DescriptorPoolSize poolSize = vk::DescriptorPoolSize()
+                                          .setType(vk::DescriptorType::eUniformBuffer)
+                                          .setDescriptorCount(static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT));
+
+    vk::DescriptorPoolCreateInfo poolCreateInfo = vk::DescriptorPoolCreateInfo()
+                                                      .setPoolSizeCount(1)
+                                                      .setPPoolSizes(&poolSize)
+                                                      .setMaxSets(static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT));
+
+    vk::Result result = logicalDevice.createDescriptorPool(&poolCreateInfo, nullptr, &descriptorPool);
+    if (result != vk::Result::eSuccess)
+    {
+        throw std::runtime_error("Failed to create descriptor pool! Error Code: " + vk::to_string(result));
+    }
+}
+
+void Application::createDescriptorSets()
+{
+    std::vector<vk::DescriptorSetLayout> layouts(MAX_FRAMES_IN_FLIGHT, descriptorSetLayout);
+
+    vk::DescriptorSetAllocateInfo allocateInfo = vk::DescriptorSetAllocateInfo()
+                                                     .setDescriptorPool(descriptorPool)
+                                                     .setDescriptorSetCount(static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT))
+                                                     .setPSetLayouts(layouts.data());
+
+    descriptorSets.resize(MAX_FRAMES_IN_FLIGHT);
+
+    vk::Result result = logicalDevice.allocateDescriptorSets(&allocateInfo, descriptorSets.data());
+    if (result != vk::Result::eSuccess)
+    {
+        throw std::runtime_error("Failed to allocate descriptor sets! Error Code: " + vk::to_string(result));
+    }
+
+    for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
+    {
+        vk::DescriptorBufferInfo bufferInfo = vk::DescriptorBufferInfo()
+                                                  .setBuffer(uniformBuffers[i])
+                                                  .setOffset(0)
+                                                  .setRange(sizeof(UniformBufferObject));
+
+        vk::WriteDescriptorSet descriptorWrite = vk::WriteDescriptorSet()
+                                                     .setDstSet(descriptorSets[i])
+                                                     .setDstBinding(0)
+                                                     .setDstArrayElement(0)
+                                                     .setDescriptorType(vk::DescriptorType::eUniformBuffer)
+                                                     .setDescriptorCount(1)
+                                                     .setPBufferInfo(&bufferInfo)
+                                                     .setPImageInfo(nullptr)
+                                                     .setPTexelBufferView(nullptr);
+
+        logicalDevice.updateDescriptorSets(1, &descriptorWrite, 0, nullptr);
+    }
 }

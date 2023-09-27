@@ -15,6 +15,7 @@
 #include <chrono>
 
 #define GLM_FORCE_RADIANS
+#define GLM_FORCE_DEFAULT_ALIGNED_GENTYPES
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
@@ -79,9 +80,9 @@ private:
 
     struct UniformBufferObject 
     {
-        glm::mat4 model;
-        glm::mat4 view;
-        glm::mat4 projection;
+        alignas(16) glm::mat4 model;
+        alignas(16) glm::mat4 view;
+        alignas(16) glm::mat4 projection;
     };
 
     void init();
@@ -154,6 +155,8 @@ private:
     void copyBuffer(vk::Buffer srcBuffer, vk::Buffer dstBuffer, vk::DeviceSize size);
 
     void createDescriptorSetLayout();
+    void createDescriptorPool();
+    void createDescriptorSets();
 
     void createUniformBuffers();
     void updateUniformBuffer(uint32_t currentImages);
@@ -251,4 +254,7 @@ private:
     std::vector<vk::Buffer> uniformBuffers;
     std::vector<vk::DeviceMemory> uniformBuffersMemory;
     std::vector<void*> uniformBuffersMapped;
+
+    vk::DescriptorPool descriptorPool;
+    std::vector<vk::DescriptorSet> descriptorSets;
 };
