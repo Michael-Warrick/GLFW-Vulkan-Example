@@ -19,6 +19,8 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
+#include "stb_image/stb_image.h"
+
 class Application
 {
 public:
@@ -47,6 +49,7 @@ private:
     {
         glm::vec2 position;
         glm::vec3 color;
+        glm::vec2 textureCoordinates;
 
         static vk::VertexInputBindingDescription getBindingDescription()
         {
@@ -58,9 +61,9 @@ private:
             return bindingDescription;
         }
 
-        static std::array<vk::VertexInputAttributeDescription, 2> getAttributeDescriptions()
+        static std::array<vk::VertexInputAttributeDescription, 3> getAttributeDescriptions()
         {
-            std::array<vk::VertexInputAttributeDescription, 2> attributeDescriptions{};
+            std::array<vk::VertexInputAttributeDescription, 3> attributeDescriptions{};
 
             attributeDescriptions[0]
                 .setBinding(0)
@@ -73,6 +76,12 @@ private:
                 .setLocation(1)
                 .setFormat(vk::Format::eR32G32B32Sfloat)
                 .setOffset(offsetof(Vertex, color));
+
+            attributeDescriptions[2]
+            .setBinding(0)
+            .setLocation(2)
+            .setFormat(vk::Format::eR32G32Sfloat)
+            .setOffset(offsetof(Vertex, textureCoordinates));
 
             return attributeDescriptions;
         }
@@ -161,6 +170,18 @@ private:
     void createUniformBuffers();
     void updateUniformBuffer(uint32_t currentImages);
 
+    void createTextureImage();
+    void createTextureImageView();
+    void createImage(uint32_t width, uint32_t height, vk::Format format, vk::ImageTiling tiling, vk::ImageUsageFlags usage, vk::MemoryPropertyFlags properties, vk::Image &image, vk::DeviceMemory &imageMemory);
+    vk::CommandBuffer beginSingleTimeCommands();
+    void endSingleTimeCommands(vk::CommandBuffer commandBuffer);
+
+    void transitionImageLayout(vk::Image image, vk::Format format, vk::ImageLayout oldLayout, vk::ImageLayout newLayout);
+    void copyBufferToImage(vk::Buffer buffer, vk::Image image, uint32_t width, uint32_t height);
+
+    vk::ImageView createImageView(vk::Image image, vk::Format format);
+    void createTextureSampler();
+
     const int MAX_FRAMES_IN_FLIGHT = 2;
     GLFWwindow *window = nullptr;
 
@@ -236,11 +257,11 @@ private:
     bool framebufferResized = false;
 
     const std::vector<Vertex> vertices = {
-        // Position (x, y) and Color (RGB)
-        {{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}},
-        {{0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}},
-        {{0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}},
-        {{-0.5f, 0.5f}, {1.0f, 1.0f, 1.0f}}};
+            {{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},
+            {{0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f}},
+            {{0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f}},
+            {{-0.5f, 0.5f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f}}
+    };
 
     const std::vector<uint16_t> indices = {
         0, 1, 2, 2, 3, 0
@@ -257,4 +278,9 @@ private:
 
     vk::DescriptorPool descriptorPool;
     std::vector<vk::DescriptorSet> descriptorSets;
+
+    vk::Image textureImage;
+    vk::DeviceMemory textureImageMemory;
+    vk::ImageView textureImageView;
+    vk::Sampler textureSampler;
 };

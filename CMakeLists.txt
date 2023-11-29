@@ -10,6 +10,8 @@ add_subdirectory(vendor/glfw)
 add_subdirectory(vendor/glm)
 
 add_executable(${PROJECT_NAME}
+  ${CMAKE_SOURCE_DIR}/include/stb_image/stb_image.h
+  ${CMAKE_SOURCE_DIR}/include/stb_image/stb_image_imp.cpp
   ${CMAKE_SOURCE_DIR}/include/application.hpp
 
   ${CMAKE_SOURCE_DIR}/src/main.cpp
