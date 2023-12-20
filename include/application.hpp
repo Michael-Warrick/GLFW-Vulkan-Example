@@ -3,6 +3,17 @@
 #include <vulkan/vulkan.hpp>
 #include <GLFW/glfw3.h>
 
+#define GLM_FORCE_RADIANS
+#define GLM_FORCE_DEPTH_ZERO_TO_ONE
+#define GLM_FORCE_DEFAULT_ALIGNED_GENTYPES
+#define GLM_ENABLE_EXPERIMENTAL
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtx/hash.hpp>
+
+#include "stb_image/stb_image.h"
+#include "tiny_obj_loader/tiny_obj_loader.h"
+
 #include <iostream>
 #include <exception>
 #include <stdexcept>
@@ -13,14 +24,7 @@
 #include <fstream>
 #include <array>
 #include <chrono>
-
-#define GLM_FORCE_RADIANS
-#define GLM_FORCE_DEPTH_ZERO_TO_ONE
-#define GLM_FORCE_DEFAULT_ALIGNED_GENTYPES
-#include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.hpp>
-
-#include "stb_image/stb_image.h"
+#include <unordered_map>
 
 class Application
 {
@@ -85,6 +89,21 @@ private:
             .setOffset(offsetof(Vertex, textureCoordinates));
 
             return attributeDescriptions;
+        }
+
+        bool operator==(const Vertex& other) const
+        {
+            return position == other.position && color == other.color && textureCoordinates == other.textureCoordinates;
+        }
+
+        friend struct std::hash<Vertex>;
+    };
+
+    struct VertexHasher {
+        size_t operator()(Vertex const& vertex) const {
+            return ((std::hash<glm::vec3>()(vertex.position) ^
+                     (std::hash<glm::vec3>()(vertex.color) << 1)) >> 1) ^
+                   (std::hash<glm::vec2>()(vertex.textureCoordinates) << 1);
         }
     };
 
@@ -188,6 +207,8 @@ private:
     vk::Format findDepthFormat();
     bool hasStencilComponent(vk::Format format);
 
+    void loadModel();
+
     const int MAX_FRAMES_IN_FLIGHT = 2;
     GLFWwindow *window = nullptr;
 
@@ -262,23 +283,8 @@ private:
 
     bool framebufferResized = false;
 
-    const std::vector<Vertex> vertices = {
-            {{-0.5f, -0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
-            {{0.5f, -0.5f, 0.0f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},
-            {{0.5f, 0.5f, 0.0f}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}},
-            {{-0.5f, 0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}, {0.0f, 1.0f}},
-
-            {{-0.5f, -0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
-            {{0.5f, -0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},
-            {{0.5f, 0.5f, -0.5f}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}},
-            {{-0.5f, 0.5f, -0.5f}, {1.0f, 1.0f, 1.0f}, {0.0f, 1.0f}}
-    };
-
-    const std::vector<uint16_t> indices = {
-        0, 1, 2, 2, 3, 0,
-        4, 5, 6, 6, 7, 4
-    };
-    
+    std::vector<Vertex> vertices;
+    std::vector<uint32_t> indices;
     vk::Buffer vertexBuffer;
     vk::DeviceMemory vertexBufferMemory;
     vk::Buffer indexBuffer;
@@ -299,4 +305,7 @@ private:
     vk::Image depthImage;
     vk::DeviceMemory depthImageMemory;
     vk::ImageView depthImageView;
+
+    const std::string MODEL_PATH = "resources/models/viking_room/viking_room.obj";
+    const std::string TEXTURE_PATH = "resources/models/viking_room/viking_room.png";
 };
