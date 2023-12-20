@@ -31,8 +31,10 @@ _deps
 
 # Project specific stuff
 build/
-cmake-build-debug
-cmake-build-release
+cmake-build-debug/
+cmake-build-release/
 [Bb][Uu][Ii][Ll][Dd]/
 
+# Secret Files
+.idea/
 .DS_Store
