@@ -192,7 +192,7 @@ private:
 
     void createTextureImage();
     void createTextureImageView();
-    void createImage(uint32_t width, uint32_t height, uint32_t mipLevels, vk::Format format, vk::ImageTiling tiling, vk::ImageUsageFlags usage, vk::MemoryPropertyFlags properties, vk::Image &image, vk::DeviceMemory &imageMemory);
+    void createImage(uint32_t width, uint32_t height, uint32_t mipLevels, vk::SampleCountFlagBits numSamples, vk::Format format, vk::ImageTiling tiling, vk::ImageUsageFlags usage, vk::MemoryPropertyFlags properties, vk::Image &image, vk::DeviceMemory &imageMemory);
     vk::CommandBuffer beginSingleTimeCommands();
     void endSingleTimeCommands(vk::CommandBuffer commandBuffer);
 
@@ -210,6 +210,9 @@ private:
     void loadModel();
 
     void generateMipmaps(vk::Image image, vk::Format imageFormat, int32_t textureWidth, int32_t textureHeight, uint32_t mipLevels);
+
+    vk::SampleCountFlagBits getMaxUsableSampleCount();
+    void createColorResources();
 
     const int MAX_FRAMES_IN_FLIGHT = 2;
     GLFWwindow *window = nullptr;
@@ -305,10 +308,16 @@ private:
     vk::ImageView textureImageView;
     vk::Sampler textureSampler;
 
+    vk::Image colorImage;
+    vk::DeviceMemory colorImageMemory;
+    vk::ImageView colorImageView;
+
     vk::Image depthImage;
     vk::DeviceMemory depthImageMemory;
     vk::ImageView depthImageView;
 
     const std::string MODEL_PATH = "resources/models/viking_room/viking_room.obj";
     const std::string TEXTURE_PATH = "resources/models/viking_room/viking_room.png";
+
+    vk::SampleCountFlagBits msaaSamples = vk::SampleCountFlagBits::e1;
 };

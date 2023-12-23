@@ -32,6 +32,7 @@ void Application::initVulkan() {
     createDescriptorSetLayout();
     createGraphicsPipeline();
     createCommandPool();
+    createColorResources();
     createDepthResources();
     createFramebuffers();
     createTextureImage();
@@ -327,6 +328,7 @@ void Application::pickPhysicalDevice() {
 
         if (isDeviceSuitable(device)) {
             physicalDevice = device;
+            msaaSamples = getMaxUsableSampleCount();
             break;
         }
     }
@@ -466,6 +468,7 @@ void Application::createLogicalDevice() {
     }
 
     physicalDeviceFeatures.samplerAnisotropy = vk::True;
+    physicalDeviceFeatures.sampleRateShading = vk::True;
 
     logicalDeviceCreateInfo = vk::DeviceCreateInfo()
             .setPQueueCreateInfos(queueFamilyCreateInfos.data())
@@ -650,8 +653,8 @@ void Application::createGraphicsPipeline() {
 
     vk::PipelineMultisampleStateCreateInfo multisamplingCreateInfo = vk::PipelineMultisampleStateCreateInfo()
             .setSampleShadingEnable(VK_FALSE)
-            .setRasterizationSamples(vk::SampleCountFlagBits::e1)
-            .setMinSampleShading(1.0f)
+            .setRasterizationSamples(msaaSamples)
+            .setMinSampleShading(0.2f)
             .setPSampleMask(nullptr)
             .setAlphaToCoverageEnable(VK_FALSE)
             .setAlphaToOneEnable(VK_FALSE);
@@ -760,6 +763,26 @@ vk::ShaderModule Application::createShaderModule(const std::vector<char> &code) 
 void Application::createRenderPass() {
     vk::AttachmentDescription colorAttachment = vk::AttachmentDescription()
             .setFormat(swapChainImageFormat)
+            .setSamples(msaaSamples)
+            .setLoadOp(vk::AttachmentLoadOp::eClear)
+            .setStoreOp(vk::AttachmentStoreOp::eStore)
+            .setStencilLoadOp(vk::AttachmentLoadOp::eDontCare)
+            .setStencilStoreOp(vk::AttachmentStoreOp::eDontCare)
+            .setInitialLayout(vk::ImageLayout::eUndefined)
+            .setFinalLayout(vk::ImageLayout::eColorAttachmentOptimal);
+
+    vk::AttachmentDescription depthAttachment = vk::AttachmentDescription()
+            .setFormat(findDepthFormat())
+            .setSamples(msaaSamples)
+            .setLoadOp(vk::AttachmentLoadOp::eClear)
+            .setStoreOp(vk::AttachmentStoreOp::eStore)
+            .setStencilLoadOp(vk::AttachmentLoadOp::eDontCare)
+            .setStencilStoreOp(vk::AttachmentStoreOp::eDontCare)
+            .setInitialLayout(vk::ImageLayout::eUndefined)
+            .setFinalLayout(vk::ImageLayout::eDepthStencilAttachmentOptimal);
+
+    vk::AttachmentDescription colorAttachmentResolve = vk::AttachmentDescription()
+            .setFormat(swapChainImageFormat)
             .setSamples(vk::SampleCountFlagBits::e1)
             .setLoadOp(vk::AttachmentLoadOp::eClear)
             .setStoreOp(vk::AttachmentStoreOp::eStore)
@@ -767,16 +790,6 @@ void Application::createRenderPass() {
             .setStencilStoreOp(vk::AttachmentStoreOp::eDontCare)
             .setInitialLayout(vk::ImageLayout::eUndefined)
             .setFinalLayout(vk::ImageLayout::ePresentSrcKHR);
-
-    vk::AttachmentDescription depthAttachment = vk::AttachmentDescription()
-            .setFormat(findDepthFormat())
-            .setSamples(vk::SampleCountFlagBits::e1)
-            .setLoadOp(vk::AttachmentLoadOp::eClear)
-            .setStoreOp(vk::AttachmentStoreOp::eStore)
-            .setStencilLoadOp(vk::AttachmentLoadOp::eDontCare)
-            .setStencilStoreOp(vk::AttachmentStoreOp::eDontCare)
-            .setInitialLayout(vk::ImageLayout::eUndefined)
-            .setFinalLayout(vk::ImageLayout::eDepthStencilAttachmentOptimal);
 
     vk::AttachmentReference colorAttachmentReference = vk::AttachmentReference()
             .setAttachment(0)
@@ -786,11 +799,16 @@ void Application::createRenderPass() {
             .setAttachment(1)
             .setLayout(vk::ImageLayout::eDepthStencilAttachmentOptimal);
 
+    vk::AttachmentReference colorAttachmentResolveReference = vk::AttachmentReference()
+            .setAttachment(2)
+            .setLayout(vk::ImageLayout::eColorAttachmentOptimal);
+
     vk::SubpassDescription subpass = vk::SubpassDescription()
             .setPipelineBindPoint(vk::PipelineBindPoint::eGraphics)
             .setColorAttachmentCount(1)
             .setPColorAttachments(&colorAttachmentReference)
-            .setPDepthStencilAttachment(&depthAttachmentReference);
+            .setPDepthStencilAttachment(&depthAttachmentReference)
+            .setPResolveAttachments(&colorAttachmentResolveReference);
 
     vk::SubpassDependency subpassDependency = vk::SubpassDependency()
             .setSrcSubpass(vk::SubpassExternal)
@@ -800,7 +818,7 @@ void Application::createRenderPass() {
             .setDstStageMask(vk::PipelineStageFlagBits::eColorAttachmentOutput | vk::PipelineStageFlagBits::eEarlyFragmentTests)
             .setDstAccessMask(vk::AccessFlagBits::eColorAttachmentWrite | vk::AccessFlagBits::eDepthStencilAttachmentWrite);
 
-    std::array<vk::AttachmentDescription, 2> attachments = {colorAttachment, depthAttachment};
+    std::array<vk::AttachmentDescription, 3> attachments = {colorAttachment, depthAttachment, colorAttachmentResolve};
     vk::RenderPassCreateInfo renderPassCreateInfo = vk::RenderPassCreateInfo()
             .setAttachmentCount(static_cast<uint32_t>(attachments.size()))
             .setPAttachments(attachments.data())
@@ -820,7 +838,7 @@ void Application::createFramebuffers() {
 
     for (size_t i = 0; i < swapChainImageViews.size(); i++) {
 
-        std::array<vk::ImageView, 2> attachments = {swapChainImageViews[i], depthImageView};
+        std::array<vk::ImageView, 3> attachments = {colorImageView, depthImageView, swapChainImageViews[i]};
         vk::FramebufferCreateInfo framebufferCreateInfo = vk::FramebufferCreateInfo()
                 .setRenderPass(renderPass)
                 .setAttachmentCount(static_cast<uint32_t>(attachments.size()))
@@ -871,9 +889,10 @@ void Application::recordCommandBuffer(vk::CommandBuffer commandBuffer, uint32_t 
         throw std::runtime_error("Failed to allocate command buffers! Error Code: " + vk::to_string(result));
     }
 
-    std::array<vk::ClearValue, 2> clearValues{};
+    std::array<vk::ClearValue, 3> clearValues{};
     clearValues[0].color = vk::ClearColorValue(std::array<float, 4>{0.0f, 0.0f, 0.0f, 1.0f});
     clearValues[1].depthStencil = vk::ClearDepthStencilValue{1.0f, 0};
+    clearValues[2].color = vk::ClearColorValue(std::array<float, 4>{0.0f, 0.0f, 0.0f, 1.0f});
 
     vk::RenderPassBeginInfo renderPassBeginCreateInfo = vk::RenderPassBeginInfo()
             .setRenderPass(renderPass)
@@ -1023,11 +1042,16 @@ void Application::recreateSwapChain() {
 
     createSwapChain();
     createImageViews();
+    createColorResources();
     createDepthResources();
     createFramebuffers();
 }
 
 void Application::cleanupSwapChain() {
+    logicalDevice.destroyImageView(colorImageView);
+    logicalDevice.destroyImage(colorImage);
+    logicalDevice.freeMemory(colorImageMemory);
+
     logicalDevice.destroyImageView(depthImageView);
     logicalDevice.destroyImage(depthImage);
     logicalDevice.freeMemory(depthImageMemory);
@@ -1315,7 +1339,7 @@ void Application::createTextureImage() {
 
     stbi_image_free(pixels);
 
-    createImage(textureWidth, textureHeight, mipLevels, vk::Format::eR8G8B8A8Srgb,  vk::ImageTiling::eOptimal, vk::ImageUsageFlagBits::eTransferSrc |
+    createImage(textureWidth, textureHeight, mipLevels, vk::SampleCountFlagBits::e1, vk::Format::eR8G8B8A8Srgb,  vk::ImageTiling::eOptimal, vk::ImageUsageFlagBits::eTransferSrc |
                 vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled,
                 vk::MemoryPropertyFlagBits::eDeviceLocal, textureImage, textureImageMemory);
 
@@ -1328,9 +1352,9 @@ void Application::createTextureImage() {
     generateMipmaps(textureImage, vk::Format::eR8G8B8A8Srgb, textureWidth, textureHeight, mipLevels);
 }
 
-void Application::createImage(uint32_t width, uint32_t height, uint32_t mipLevels, vk::Format format, vk::ImageTiling tiling,
-                              vk::ImageUsageFlags usage, vk::MemoryPropertyFlags properties, vk::Image &image,
-                              vk::DeviceMemory &imageMemory) {
+void Application::createImage(uint32_t width, uint32_t height, uint32_t mipLevels, vk::SampleCountFlagBits numSamples,
+                              vk::Format format, vk::ImageTiling tiling, vk::ImageUsageFlags usage,
+                              vk::MemoryPropertyFlags properties, vk::Image &image, vk::DeviceMemory &imageMemory) {
     vk::ImageCreateInfo imageCreateInfo = vk::ImageCreateInfo()
             .setImageType(vk::ImageType::e2D)
             .setExtent(
@@ -1344,7 +1368,7 @@ void Application::createImage(uint32_t width, uint32_t height, uint32_t mipLevel
             .setTiling(tiling)
             .setInitialLayout(vk::ImageLayout::eUndefined)
             .setUsage(usage)
-            .setSamples(vk::SampleCountFlagBits::e1)
+            .setSamples(numSamples)
             .setSharingMode(vk::SharingMode::eExclusive);
 
     vk::Result result = logicalDevice.createImage(&imageCreateInfo, nullptr, &image);
@@ -1540,7 +1564,7 @@ void Application::createTextureSampler()
 void Application::createDepthResources() {
     vk::Format depthFormat = findDepthFormat();
 
-    createImage(swapChainExtent.width, swapChainExtent.height, 1, depthFormat, vk::ImageTiling::eOptimal,
+    createImage(swapChainExtent.width, swapChainExtent.height, 1, msaaSamples, depthFormat, vk::ImageTiling::eOptimal,
                 vk::ImageUsageFlagBits::eDepthStencilAttachment, vk::MemoryPropertyFlagBits::eDeviceLocal, depthImage,
                 depthImageMemory);
     depthImageView = createImageView(depthImage, depthFormat, vk::ImageAspectFlagBits::eDepth, 1);
@@ -1708,14 +1732,8 @@ void Application::generateMipmaps(vk::Image image, vk::Format imageFormat, int32
                                       0,nullptr,
                                       1, &barrier);
 
-        if (mipWidth > 1)
-        {
-            mipWidth /= 2;
-        }
-        if (mipHeight > 1)
-        {
-            mipHeight /= 2;
-        }
+        if (mipWidth > 1) { mipWidth /= 2; }
+        if (mipHeight > 1) { mipHeight /= 2; }
     }
 
     barrier.subresourceRange.setBaseMipLevel(mipLevels - 1);
@@ -1731,4 +1749,31 @@ void Application::generateMipmaps(vk::Image image, vk::Format imageFormat, int32
                                   1, &barrier);
 
     endSingleTimeCommands(commandBuffer);
+}
+
+vk::SampleCountFlagBits Application::getMaxUsableSampleCount()
+{
+    vk::PhysicalDeviceProperties physicalDevicesProperties;
+    physicalDevice.getProperties(&physicalDevicesProperties);
+
+    vk::SampleCountFlags sampleCounts = (physicalDevicesProperties.limits.framebufferColorSampleCounts & physicalDevicesProperties.limits.framebufferDepthSampleCounts);
+    if (sampleCounts & vk::SampleCountFlagBits::e64) { return vk::SampleCountFlagBits::e64; }
+    if (sampleCounts & vk::SampleCountFlagBits::e32) { return vk::SampleCountFlagBits::e32; }
+    if (sampleCounts & vk::SampleCountFlagBits::e16) { return vk::SampleCountFlagBits::e16; }
+    if (sampleCounts & vk::SampleCountFlagBits::e8) { return vk::SampleCountFlagBits::e8; }
+    if (sampleCounts & vk::SampleCountFlagBits::e4) { return vk::SampleCountFlagBits::e4; }
+    if (sampleCounts & vk::SampleCountFlagBits::e2) { return vk::SampleCountFlagBits::e2; }
+
+    return vk::SampleCountFlagBits::e1;
+}
+
+void Application::createColorResources()
+{
+    vk::Format colorFormat = swapChainImageFormat;
+
+    createImage(swapChainExtent.width, swapChainExtent.height, 1, msaaSamples, colorFormat, vk::ImageTiling::eOptimal,
+                vk::ImageUsageFlagBits::eTransientAttachment | vk::ImageUsageFlagBits::eColorAttachment, vk::MemoryPropertyFlagBits::eDeviceLocal,
+                colorImage, colorImageMemory);
+
+    colorImageView = createImageView(colorImage, colorFormat, vk::ImageAspectFlagBits::eColor, 1);
 }
