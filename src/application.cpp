@@ -35,10 +35,10 @@ void Application::initVulkan() {
     createColorResources();
     createDepthResources();
     createFramebuffers();
-    createTextureImage();
+    createTextureImage(TEXTURE_PATH.c_str());
     createTextureImageView();
     createTextureSampler();
-    loadModel();
+    loadModel(MODEL_PATH.c_str());
     createVertexBuffer();
     createIndexBuffer();
     createUniformBuffers();
@@ -771,6 +771,10 @@ void Application::createRenderPass() {
             .setInitialLayout(vk::ImageLayout::eUndefined)
             .setFinalLayout(vk::ImageLayout::eColorAttachmentOptimal);
 
+    vk::AttachmentReference colorAttachmentReference = vk::AttachmentReference()
+            .setAttachment(0)
+            .setLayout(vk::ImageLayout::eColorAttachmentOptimal);
+
     vk::AttachmentDescription depthAttachment = vk::AttachmentDescription()
             .setFormat(findDepthFormat())
             .setSamples(msaaSamples)
@@ -781,23 +785,19 @@ void Application::createRenderPass() {
             .setInitialLayout(vk::ImageLayout::eUndefined)
             .setFinalLayout(vk::ImageLayout::eDepthStencilAttachmentOptimal);
 
+    vk::AttachmentReference depthAttachmentReference = vk::AttachmentReference()
+            .setAttachment(1)
+            .setLayout(vk::ImageLayout::eDepthStencilAttachmentOptimal);
+
     vk::AttachmentDescription colorAttachmentResolve = vk::AttachmentDescription()
             .setFormat(swapChainImageFormat)
             .setSamples(vk::SampleCountFlagBits::e1)
-            .setLoadOp(vk::AttachmentLoadOp::eClear)
+            .setLoadOp(vk::AttachmentLoadOp::eDontCare)
             .setStoreOp(vk::AttachmentStoreOp::eStore)
             .setStencilLoadOp(vk::AttachmentLoadOp::eDontCare)
             .setStencilStoreOp(vk::AttachmentStoreOp::eDontCare)
             .setInitialLayout(vk::ImageLayout::eUndefined)
             .setFinalLayout(vk::ImageLayout::ePresentSrcKHR);
-
-    vk::AttachmentReference colorAttachmentReference = vk::AttachmentReference()
-            .setAttachment(0)
-            .setLayout(vk::ImageLayout::eColorAttachmentOptimal);
-
-    vk::AttachmentReference depthAttachmentReference = vk::AttachmentReference()
-            .setAttachment(1)
-            .setLayout(vk::ImageLayout::eDepthStencilAttachmentOptimal);
 
     vk::AttachmentReference colorAttachmentResolveReference = vk::AttachmentReference()
             .setAttachment(2)
@@ -889,17 +889,16 @@ void Application::recordCommandBuffer(vk::CommandBuffer commandBuffer, uint32_t 
         throw std::runtime_error("Failed to allocate command buffers! Error Code: " + vk::to_string(result));
     }
 
-    std::array<vk::ClearValue, 3> clearValues{};
+    std::array<vk::ClearValue, 2> clearValues{};
     clearValues[0].color = vk::ClearColorValue(std::array<float, 4>{0.0f, 0.0f, 0.0f, 1.0f});
     clearValues[1].depthStencil = vk::ClearDepthStencilValue{1.0f, 0};
-    clearValues[2].color = vk::ClearColorValue(std::array<float, 4>{0.0f, 0.0f, 0.0f, 1.0f});
 
     vk::RenderPassBeginInfo renderPassBeginCreateInfo = vk::RenderPassBeginInfo()
+            .setClearValueCount(static_cast<uint32_t>(clearValues.size()))
+            .setPClearValues(clearValues.data())
             .setRenderPass(renderPass)
             .setFramebuffer(swapChainFrameBuffers[imageIndex])
-            .setRenderArea(vk::Rect2D({0, 0}, swapChainExtent))
-            .setClearValueCount(static_cast<uint32_t>(clearValues.size()))
-            .setPClearValues(clearValues.data());
+            .setRenderArea(vk::Rect2D({0, 0}, swapChainExtent));
 
     commandBuffer.beginRenderPass(&renderPassBeginCreateInfo, vk::SubpassContents::eInline);
     commandBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, graphicsPipeline);
@@ -1056,12 +1055,12 @@ void Application::cleanupSwapChain() {
     logicalDevice.destroyImage(depthImage);
     logicalDevice.freeMemory(depthImageMemory);
 
-    for (size_t i = 0; i < swapChainFrameBuffers.size(); i++) {
-        logicalDevice.destroyFramebuffer(swapChainFrameBuffers[i]);
+    for (auto swapChainFrameBuffer : swapChainFrameBuffers) {
+        logicalDevice.destroyFramebuffer(swapChainFrameBuffer);
     }
 
-    for (size_t i = 0; i < swapChainImageViews.size(); i++) {
-        logicalDevice.destroyImageView(swapChainImageViews[i]);
+    for (auto swapChainImageView : swapChainImageViews) {
+        logicalDevice.destroyImageView(swapChainImageView);
     }
 
     logicalDevice.destroySwapchainKHR(swapChain);
@@ -1306,12 +1305,12 @@ void Application::createDescriptorSets() {
     }
 }
 
-void Application::createTextureImage() {
+void Application::createTextureImage(const char* texturePath) {
     int textureWidth;
     int textureHeight;
     int textureChannels;
 
-    stbi_uc *pixels = stbi_load(TEXTURE_PATH.c_str(), &textureWidth, &textureHeight, &textureChannels,
+    stbi_uc *pixels = stbi_load(texturePath, &textureWidth, &textureHeight, &textureChannels,
                                 STBI_rgb_alpha);
     vk::DeviceSize imageSize = textureWidth * textureHeight * 4;
     mipLevels = static_cast<uint32_t>(std::floor(std::log2(std::max(textureWidth, textureHeight)))) + 1;
@@ -1585,9 +1584,9 @@ vk::Format Application::findSupportedFormat(const std::vector<vk::Format> &candi
         {
             return format;
         }
-
-        throw std::runtime_error("Failed to find supported format!");
     }
+
+    throw std::runtime_error("Failed to find supported format!");
 }
 
 vk::Format Application::findDepthFormat()
@@ -1604,14 +1603,14 @@ bool Application::hasStencilComponent(vk::Format format)
     return format == vk::Format::eD32SfloatS8Uint || format == vk::Format::eD24UnormS8Uint;
 }
 
-void Application::loadModel()
+void Application::loadModel(const char* modelPath)
 {
     tinyobj::attrib_t attrib;
     std::vector<tinyobj::shape_t> shapes;
     std::vector<tinyobj::material_t> materials;
     std::string warning, error;
 
-    if (!tinyobj::LoadObj(&attrib, &shapes, &materials, &warning, &error, MODEL_PATH.c_str()))
+    if (!tinyobj::LoadObj(&attrib, &shapes, &materials, &warning, &error, modelPath))
     {
         throw std::runtime_error(warning + error);
     }

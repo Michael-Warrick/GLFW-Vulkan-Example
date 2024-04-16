@@ -190,7 +190,7 @@ private:
     void createUniformBuffers();
     void updateUniformBuffer(uint32_t currentImages);
 
-    void createTextureImage();
+    void createTextureImage(const char* texturePath);
     void createTextureImageView();
     void createImage(uint32_t width, uint32_t height, uint32_t mipLevels, vk::SampleCountFlagBits numSamples, vk::Format format, vk::ImageTiling tiling, vk::ImageUsageFlags usage, vk::MemoryPropertyFlags properties, vk::Image &image, vk::DeviceMemory &imageMemory);
     vk::CommandBuffer beginSingleTimeCommands();
@@ -207,7 +207,7 @@ private:
     vk::Format findDepthFormat();
     bool hasStencilComponent(vk::Format format);
 
-    void loadModel();
+    void loadModel(const char* modelPath);
 
     void generateMipmaps(vk::Image image, vk::Format imageFormat, int32_t textureWidth, int32_t textureHeight, uint32_t mipLevels);
 
